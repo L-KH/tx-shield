@@ -1,0 +1,40 @@
+// Copy these to test different transaction types manually
+// Token Approval (USDC to Uniswap V2 Router)
+// Risk: HIGH - Unlimited approval
+const tokenApproval = {
+  to: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+  data: '0x095ea7b30000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
+  value: '0'
+};
+
+// Limited Token Approval (USDC to Uniswap V2 Router)
+// Risk: SAFE - Limited approval amount
+const limitedApproval = {
+  to: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+  data: '0x095ea7b30000000000000000000000007a250d5630b4cf539739df2c5dacb4c659f2488d0000000000000000000000000000000000000000000000000000000005f5e100',
+  value: '0'
+};
+
+// Token Swap on Uniswap
+// Risk: SUSPICIOUS - DEX swap with MEV risk
+const tokenSwap = {
+  to: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
+  data: '0x38ed17390000000000000000000000000000000000000000000000000de0b6b3a764000000000000000000000000000000000000000000000000000000000000009c40000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000a58950f05fed3d160fb591f9e8bbd1820a6c3720000000000000000000000000000000000000000000000000000000006432d40000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
+  value: '100000000000000000' // 0.1 ETH
+};
+
+// Dangerous contract interaction
+// Risk: CRITICAL - Known phishing address
+const dangerousInteraction = {
+  to: '0xdef1c0ded9bec7f1a1670819833240f027b25eff',
+  data: '0x095ea7b3000000000000000000000000def1c0ded9bec7f1a1670819833240f027b25efffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
+  value: '0'
+};
+
+// ETH Transfer
+// Risk: SAFE - Simple ETH transfer
+const ethTransfer = {
+  to: '0xa58950f05fed3d160fb591f9e8bbd1820a6c3720',
+  data: '0x',
+  value: '1000000000000000000' // 1 ETH
+};

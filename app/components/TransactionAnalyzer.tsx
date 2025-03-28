@@ -8,6 +8,12 @@ import useMetaMask from '@/lib/hooks/useMetaMask';
 import { executeSecureTransaction, checkAddressThreat } from '@/lib/blockchain/contracts';
 import { ethers } from 'ethers';
 
+
+import LoadingState from './ui/LoadingState';
+import RiskConfirmationDialog from './ui/RiskConfirmationDialog';
+import Tooltip, { DeFiGlossary } from './ui/Tooltip';
+import AdvancedTransactionAnalysis from './AdvancedTransactionAnalysis';
+
 // Component for threat level indicator
 const ThreatIndicator = ({ level, confidence, description, recommendation }) => {
   // Define colors based on threat level
@@ -101,7 +107,17 @@ const TransactionAnalyzer = () => {
     isCorrectNetwork: true, 
     name: 'Ethereum' 
   });
-  
+  type LoadingStage = 'initializing' | 'analyzing' | 'simulating' | 'finalizing';
+  const [analysisStage, setAnalysisStage] = useState<LoadingStage>('initializing');
+const [analysisProgress, setAnalysisProgress] = useState(0);
+const [showRiskDialog, setShowRiskDialog] = useState(false);
+const [riskDialogDetails, setRiskDialogDetails] = useState({
+
+  title: '',
+  description: '',
+  risks: [],
+  alternatives: []
+});
   // Transaction state
   const [transaction, setTransaction] = useState({
     to: '',
@@ -295,9 +311,7 @@ const handleNetworkSwitch = async () => {
   
   // Analyze transaction
 // Analyze transaction
-// Analyze transaction
-// Updated analyzeTransaction function with better error handling
-// Modified analyzeTransaction function that doesn't check response.ok
+// Update your analyzeTransaction function with better error handling for JSON parsing
 const analyzeTransaction = async () => {
   if (!transaction.to || !transaction.data) {
     alert('Please provide transaction details');
@@ -305,9 +319,18 @@ const analyzeTransaction = async () => {
   }
   
   setLoading(true);
+  setAnalysisStage('initializing');
+  setAnalysisProgress(10);
   
   try {
+    // Simulate analysis stages with progress updates
+    const simulateProgress = (stage, progress) => {
+      setAnalysisStage(stage);
+      setAnalysisProgress(progress);
+    };
+    
     // First, check if the contract is blacklisted
+    simulateProgress('analyzing', 30);
     try {
       const isThreat = await checkAddressThreat(transaction.to);
       if (isThreat) {
@@ -321,188 +344,218 @@ const analyzeTransaction = async () => {
     const requestBody = JSON.stringify(transaction);
     console.log('Request body:', requestBody);
     
-    // Use Promise.allSettled to handle both API calls, even if one fails
-    const [threatResult, simulationResult] = await Promise.allSettled([
-      // Threat Check API call
-      (async () => {
-        try {
-          console.log('Calling threat-check API...');
-          const response = await fetch('/api/threat-check', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: requestBody
-          });
-          console.log('Threat-check response status:', response.status);
-          
-          // Even if status is 500, try to get the response text
-          const text = await response.text();
-          console.log('Threat-check response length:', text.length);
-          
-          if (!text || text.trim() === '') {
-            console.log('Empty response from threat-check API');
-            return null;
-          }
-          
-          try {
-            return JSON.parse(text);
-          } catch (error) {
-            console.error('Failed to parse threat-check response:', error);
-            console.error('Raw response:', text);
-            return null;
-          }
-        } catch (error) {
-          console.error('Threat-check API call failed:', error);
-          return null;
-        }
-      })(),
-      
-      // Simulation API call
-      (async () => {
-        try {
-          console.log('Calling simulate API...');
-          const response = await fetch('/api/simulate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: requestBody
-          });
-          console.log('Simulation response status:', response.status);
-          
-          // Even if status is 500, try to get the response text
-          const text = await response.text();
-          console.log('Simulation response length:', text.length);
-          
-          if (!text || text.trim() === '') {
-            console.log('Empty response from simulation API');
-            return null;
-          }
-          
-          try {
-            return JSON.parse(text);
-          } catch (error) {
-            console.error('Failed to parse simulation response:', error);
-            console.error('Raw response:', text);
-            return null;
-          }
-        } catch (error) {
-          console.error('Simulation API call failed:', error);
-          return null;
-        }
-      })()
-    ]);
+    // Use Promise.all to handle both API calls
+    simulateProgress('analyzing', 50);
     
-    // Process threat analysis result
-    if (threatResult.status === 'fulfilled' && threatResult.value) {
-      console.log('Threat analysis successful');
-      setThreatAnalysis(threatResult.value);
-    } else {
-      console.log('Using fallback threat analysis');
-      // Create fallback threat analysis based on transaction type
-      const isApproval = transaction.data.startsWith('0x095ea7b3');
-      const isUnlimitedApproval = transaction.data.includes('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
-      const isSwap = transaction.data.startsWith('0x38ed1739');
+    // More robust API calls with better error handling
+    let threatResult, simulationResult;
+    
+    try {
+      const threatResponse = await fetch('/api/threat-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: requestBody
+      });
       
-      let threatLevel = "SAFE";
-      let reasoning = "This transaction appears to use standard parameters.";
+      console.log('Threat check status:', threatResponse.status);
       
-      if (isUnlimitedApproval) {
-        threatLevel = "HIGH";
-        reasoning = "This transaction contains an unlimited token approval which gives the recipient contract complete control over your tokens.";
-      } else if (isApproval) {
-        threatLevel = "SUSPICIOUS";
-        reasoning = "This transaction approves token spending to a third-party contract.";
-      } else if (isSwap) {
-        threatLevel = "SUSPICIOUS";
-        reasoning = "This appears to be a token swap transaction.";
+      // Try to get text response first to debug
+      const responseText = await threatResponse.text();
+      console.log('Response text length:', responseText.length);
+      
+      if (responseText.trim() === '') {
+        console.error('Empty response from server');
+        setThreatAnalysis(createFallbackThreatAnalysis(transaction));
+      } else {
+        try {
+          // Parse the text as JSON
+          threatResult = JSON.parse(responseText);
+          setThreatAnalysis(threatResult);
+        } catch (jsonError) {
+          console.error('JSON parsing error:', jsonError);
+          console.error('Raw response:', responseText);
+          setThreatAnalysis(createFallbackThreatAnalysis(transaction));
+        }
       }
-      
-      // Set fallback threat analysis
-      setThreatAnalysis({
-        threatLevel,
-        confidence: 0.5,
-        mitigationSuggestions: [
-          "Verify the contract address on Etherscan before proceeding",
-          isUnlimitedApproval ? "Use a limited approval amount instead of unlimited" : "",
-          isSwap ? "Be cautious of potential slippage" : "",
-          "Consider using a hardware wallet for better security"
-        ].filter(Boolean),
-        details: {
-          mlScore: isUnlimitedApproval ? 0.75 : (isApproval || isSwap ? 0.5 : 0.2),
-          signatureMatches: [],
-          similarTransactions: [],
-          llmAnalysis: {
-            assessment: threatLevel === "SAFE" ? "SAFE" : 
-                      threatLevel === "SUSPICIOUS" ? "SUSPICIOUS" : "DANGEROUS",
-            reasoning
-          }
-        }
-      });
+    } catch (threatError) {
+      console.error('Threat analysis request failed:', threatError);
+      setThreatAnalysis(createFallbackThreatAnalysis(transaction));
     }
     
-    // Process simulation result
-    if (simulationResult.status === 'fulfilled' && simulationResult.value) {
-      console.log('Simulation successful');
-      setSimulation(simulationResult.value);
-    } else {
-      console.log('Using fallback simulation data');
-      // Create fallback simulation based on transaction type
-      const isApproval = transaction.data.startsWith('0x095ea7b3');
-      const isUnlimitedApproval = transaction.data.includes('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
-      const isSwap = transaction.data.startsWith('0x38ed1739');
-      
-      // Set fallback simulation data
-      setSimulation({
-        success: true,
-        statusCode: 1,
-        gasEstimate: {
-          gasUsed: isSwap ? "150000" : "65000",
-          gasLimit: isSwap ? "225000" : "97500",
-          gasCost: "0.00170",
-          gasCostUSD: 3.40
-        },
-        balanceChanges: [
-          {
-            address: transaction.to,
-            symbol: isUnlimitedApproval ? "TOKEN" : (isApproval ? "USDC" : "ETH"),
-            name: isUnlimitedApproval ? "Unknown Token" : (isApproval ? "USD Coin" : "Ethereum"),
-            decimals: 18,
-            oldBalance: isApproval ? "1000.0" : "10.0",
-            newBalance: isApproval ? "1000.0" : "9.9",
-            absoluteChange: isApproval ? "0.0" : "-0.1",
-            percentageChange: isApproval ? 0 : -1,
-            usdValueChange: isApproval ? 0 : -200
-          }
-        ],
-        mevExposure: isSwap ? {
-          sandwichRisk: 65,
-          frontrunningRisk: 40,
-          backrunningRisk: 25,
-          potentialMEVLoss: "0.015",
-          suggestedProtections: [
-            "Use a private transaction service",
-            "Set maximum slippage to 1%",
-            "Execute through TX Shield contract"
-          ]
-        } : null,
-        warnings: {
-          highSlippage: isSwap,
-          highGasUsage: false,
-          priceImpact: isSwap,
-          mevExposure: isSwap,
-          revertRisk: false,
-          customWarnings: isUnlimitedApproval ? ["Unlimited approval detected"] : []
-        },
-        logs: [],
-        simulationId: `sim-${Date.now()}`
+    simulateProgress('simulating', 70);
+    
+    try {
+      const simulationResponse = await fetch('/api/simulate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: requestBody
       });
+      
+      console.log('Simulation status:', simulationResponse.status);
+      
+      // Try to get text response first to debug
+      const responseText = await simulationResponse.text();
+      console.log('Response text length:', responseText.length);
+      
+      if (responseText.trim() === '') {
+        console.error('Empty response from server');
+        setSimulation(createFallbackSimulation(transaction));
+      } else {
+        try {
+          // Parse the text as JSON
+          simulationResult = JSON.parse(responseText);
+          setSimulation(simulationResult);
+        } catch (jsonError) {
+          console.error('JSON parsing error:', jsonError);
+          console.error('Raw response:', responseText);
+          setSimulation(createFallbackSimulation(transaction));
+        }
+      }
+    } catch (simulationError) {
+      console.error('Simulation request failed:', simulationError);
+      setSimulation(createFallbackSimulation(transaction));
     }
+    
+    // Complete
+    simulateProgress('finalizing', 100);
+    
+    // The rest of the function remains the same...
+    const threatResultValue = threatResult || createFallbackThreatAnalysis(transaction);
+    
+    // Show risk dialog for high-risk transactions
+    if (
+      threatResultValue && 
+      (threatResultValue.threatLevel === 'HIGH' || threatResultValue.threatLevel === 'CRITICAL')
+    ) {
+      setRiskDialogDetails({
+        title: `${threatResultValue.threatLevel === 'CRITICAL' ? 'Critical' : 'High'} Risk Transaction Detected`,
+        description: threatResultValue.details?.llmAnalysis?.reasoning || 
+          'This transaction has been flagged as potentially dangerous.',
+        risks: threatResultValue.mitigationSuggestions || [],
+        alternatives: [
+          'Use a limited approval amount instead of unlimited',
+          'Try a different trusted protocol',
+          'Execute through TX Shield secure contract',
+        ]
+      });
+      setShowRiskDialog(true);
+    }
+    
   } catch (error) {
     console.error('Analysis error:', error);
     alert(`Analysis failed: ${error instanceof Error ? error.message : String(error)}`);
+    
+    // Set fallback values even when overall analysis fails
+    setThreatAnalysis(createFallbackThreatAnalysis(transaction));
+    setSimulation(createFallbackSimulation(transaction));
   } finally {
     setLoading(false);
   }
 };
+const createFallbackThreatAnalysis = (transaction) => {
+  // Create fallback threat analysis based on transaction type
+  const isApproval = transaction.data.startsWith('0x095ea7b3');
+  const isUnlimitedApproval = transaction.data.includes('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
+  const isSwap = transaction.data.startsWith('0x38ed1739');
   
+  let threatLevel = "SAFE";
+  let reasoning = "This transaction appears to use standard parameters.";
+  
+  if (isUnlimitedApproval) {
+    threatLevel = "HIGH";
+    reasoning = "This transaction contains an unlimited token approval which gives the recipient contract complete control over your tokens.";
+  } else if (isApproval) {
+    threatLevel = "SUSPICIOUS";
+    reasoning = "This transaction approves token spending to a third-party contract.";
+  } else if (isSwap) {
+    threatLevel = "SUSPICIOUS";
+    reasoning = "This appears to be a token swap transaction.";
+  }
+  
+  return {
+    threatLevel,
+    confidence: 0.5,
+    mitigationSuggestions: [
+      "Verify the contract address on Etherscan before proceeding",
+      isUnlimitedApproval ? "Use a limited approval amount instead of unlimited" : "",
+      isSwap ? "Be cautious of potential slippage" : "",
+      "Consider using a hardware wallet for better security"
+    ].filter(Boolean),
+    details: {
+      mlScore: isUnlimitedApproval ? 0.75 : (isApproval || isSwap ? 0.5 : 0.2),
+      signatureMatches: [],
+      similarTransactions: [],
+      llmAnalysis: {
+        assessment: threatLevel === "SAFE" ? "SAFE" : 
+                  threatLevel === "SUSPICIOUS" ? "SUSPICIOUS" : "DANGEROUS",
+        reasoning
+      }
+    }
+  };
+};
+
+  // Add this for executing transactions with risk confirmation
+// Helper function to create fallback simulation (add this to your component)
+const createFallbackSimulation = (transaction) => {
+  // Create fallback simulation based on transaction type
+  const isApproval = transaction.data.startsWith('0x095ea7b3');
+  const isUnlimitedApproval = transaction.data.includes('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
+  const isSwap = transaction.data.startsWith('0x38ed1739');
+  
+  return {
+    success: true,
+    statusCode: 1,
+    gasEstimate: {
+      gasUsed: isSwap ? "150000" : "65000",
+      gasLimit: isSwap ? "225000" : "97500",
+      gasCost: "0.00170",
+      gasCostUSD: 3.40
+    },
+    balanceChanges: [
+      {
+        address: transaction.to,
+        symbol: isUnlimitedApproval ? "TOKEN" : (isApproval ? "USDC" : "ETH"),
+        name: isUnlimitedApproval ? "Unknown Token" : (isApproval ? "USD Coin" : "Ethereum"),
+        decimals: 18,
+        oldBalance: isApproval ? "1000.0" : "10.0",
+        newBalance: isApproval ? "1000.0" : "9.9",
+        absoluteChange: isApproval ? "0.0" : "-0.1",
+        percentageChange: isApproval ? 0 : -1,
+        usdValueChange: isApproval ? 0 : -200
+      }
+    ],
+    mevExposure: isSwap ? {
+      sandwichRisk: 65,
+      frontrunningRisk: 40,
+      backrunningRisk: 25,
+      potentialMEVLoss: "0.015",
+      suggestedProtections: [
+        "Use a private transaction service",
+        "Set maximum slippage to 1%",
+        "Execute through TX Shield contract"
+      ]
+    } : null,
+    warnings: {
+      highSlippage: isSwap,
+      highGasUsage: false,
+      priceImpact: isSwap,
+      mevExposure: isSwap,
+      revertRisk: false,
+      customWarnings: isUnlimitedApproval ? ["Unlimited approval detected"] : []
+    },
+    logs: [],
+    simulationId: `sim-${Date.now()}`
+  };
+};
+
+// Add this function for executing transactions with risk confirmation
+const executeTransactionWithConfirmation = () => {
+  if (threatAnalysis?.threatLevel === 'CRITICAL' || threatAnalysis?.threatLevel === 'HIGH') {
+    setShowRiskDialog(true);
+  } else {
+    executeTransaction();
+  }
+};
   const executeTransaction = async () => {
     if (!threatAnalysis || !simulation) {
       alert('Please analyze the transaction first');
@@ -1119,329 +1172,432 @@ const analyzeTransaction = async () => {
     );
   };
   
-  return (
-    <div className="bg-gray-900 text-white min-h-screen">
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold flex items-center">
-            <Shield className="mr-3" size={28} />
-            TX Shield
-          </h1>
-          
-          {walletConnected ? (
-            <div className="flex items-center space-x-2">
-              <div className="flex items-center bg-gray-800 px-3 py-2 rounded-md">
-                <div className="h-3 w-3 rounded-full bg-green-500 mr-2"></div>
-                <span className="text-sm">{`${walletAddress.substring(0, 6)}...${walletAddress.substring(38)}`}</span>
-              </div>
-              <NetworkDisplay 
-                isCorrectNetwork={isCorrectNetwork} 
-                networkName={networkName}
-                switchNetwork={handleNetworkSwitch}
-              />
-            </div>
-          ) : (
-            <button
-              onClick={handleWalletConnect}
-              className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md transition-colors"
-            >
-              Connect Wallet
-            </button>
-          )}
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="col-span-2">
-            <div className="bg-gray-800 p-6 rounded-lg">
-              <h2 className="text-xl font-medium mb-6">Analyze Transaction</h2>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Contract Address</label>
-                  <input
-                    type="text"
-                    value={transaction.to}
-                    onChange={(e) => setTransaction(prev => ({ ...prev, to: e.target.value }))}
-                    placeholder="0x..."
-                    className="w-full px-3 py-2 bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Transaction Data (hex)</label>
-                  <textarea
-                    value={transaction.data}
-                    onChange={(e) => setTransaction(prev => ({ ...prev, data: e.target.value }))}
-                    placeholder="0x..."
-                    rows={4}
-                    className="w-full px-3 py-2 bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Value (ETH)</label>
-                  <input
-                    type="text"
-                    value={formatEthValue(parseFloat(transaction.value) / 1e18)}
-                    onChange={(e) => {
-                      try {
-                        const value = e.target.value === '' ? '0' : e.target.value;
-                        const valueWei = Math.floor(parseFloat(value) * 1e18).toString();
-                        setTransaction(prev => ({ ...prev, value: valueWei }));
-                      } catch (error) {
-                        // Invalid ETH amount, don't update
-                      }
-                    }}
-                    placeholder="0.0"
-                    className="w-full px-3 py-2 bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                
-                <div className="flex space-x-4">
-                  <button
-                    onClick={getTransactionFromWallet}
-                    disabled={!walletConnected || loading}
-                    className={`px-4 py-2 rounded-md flex-1 transition-colors flex items-center justify-center ${
-                      !walletConnected || loading ? 'bg-gray-600 cursor-not-allowed' : 'bg-gray-700 hover:bg-gray-600' 
-                    }`}
-                  >
-                    <Activity size={16} className="mr-2" />
-                    Get From Wallet
-                  </button>
-                  
-                  <button
-                    onClick={analyzeTransaction}
-                    disabled={loading || !transaction.to || !transaction.data}
-                    className={`px-4 py-2 rounded-md flex-1 transition-colors flex items-center justify-center ${
-                      loading || !transaction.to || !transaction.data ? 
-                      'bg-gray-600 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
-                    }`}
-                  >
-                    {loading ? (
-                      <>
-                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
-                        Analyzing...
-                      </>
-                    ) : (
-                      <>
-                        <Shield size={16} className="mr-2" />
-                        Analyze Transaction
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div>
-            <div className="bg-gray-800 p-6 rounded-lg h-full flex flex-col">
-              <h2 className="text-xl font-medium mb-6">Project Info</h2>
-              
-              <div className="text-sm space-y-4 flex-grow">
-                <p>
-                  TX Shield provides advanced security for crypto transactions 
-                  through AI-powered threat detection and simulation.
-                </p>
-                
-                <div className="pt-2">
-                  <h3 className="font-medium mb-2">Key Features:</h3>
-                  <ul className="space-y-2">
-                    <li className="flex items-start">
-                      <div className="h-5 w-5 rounded-full bg-blue-600 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5 text-xs">
-                        1
-                      </div>
-                      <span>AI-powered threat detection</span>
-                    </li>
-                    <li className="flex items-start">
-                      <div className="h-5 w-5 rounded-full bg-blue-600 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5 text-xs">
-                        2
-                      </div>
-                      <span>Transaction simulation with MEV protection</span>
-                    </li>
-                    <li className="flex items-start">
-                      <div className="h-5 w-5 rounded-full bg-blue-600 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5 text-xs">
-                        3
-                      </div>
-                      <span>Secure alternative suggestions</span>
-                    </li>
-                    <li className="flex items-start">
-                      <div className="h-5 w-5 rounded-full bg-blue-600 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5 text-xs">
-                        4
-                      </div>
-                      <span>Smart contract protection layer</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-              
-              <div className="mt-4 pt-4 border-t border-gray-700">
-                <div className="text-sm text-gray-400">
-                  <div className="flex items-center">
-                    <DollarSign size={14} className="mr-1" />
-                    <span>Gas saved: 128.5 ETH</span>
-                  </div>
-                  <div className="flex items-center mt-1">
-                    <Shield size={14} className="mr-1" />
-                    <span>Threats blocked: 1,285</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Results Section */}
-        {(threatAnalysis || simulation) && (
-          <div>
-            <div className="bg-gray-800 p-6 rounded-lg">
-              <div className="flex border-b border-gray-700 mb-6">
-                <button
-                  className={`px-4 py-2 border-b-2 ${
-                    activeTab === 'analysis' ? 
-                    'border-blue-500 text-blue-500' : 
-                    'border-transparent text-gray-400'
-                  }`}
-                  onClick={() => setActiveTab('analysis')}
-                >
-                  Threat Analysis
-                </button>
-                <button
-                  className={`px-4 py-2 border-b-2 ${
-                    activeTab === 'simulation' ? 
-                    'border-blue-500 text-blue-500' : 
-                    'border-transparent text-gray-400'
-                  }`}
-                  onClick={() => setActiveTab('simulation')}
-                >
-                  Simulation Results
-                </button>
-                <button
-                  className={`px-4 py-2 border-b-2 ${
-                    activeTab === 'alternatives' ? 
-                    'border-blue-500 text-blue-500' : 
-                    'border-transparent text-gray-400'
-                  }`}
-                  onClick={() => setActiveTab('alternatives')}
-                >
-                  Safer Alternatives
-                </button>
-              </div>
-              
-              <AnimatePresence mode="wait">
-                {activeTab === 'analysis' && (
-                  <motion.div
-                    key="analysis"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                  >
-                    {renderThreatIndicator()}
-                    {renderThreatDetails()}
-                    {renderRecommendations()}
-                    {isCorrectNetwork && renderSecureContract()}
+// TransactionAnalyzer.tsx - Complete render function
+// Replace your existing return statement with this entire block
 
-                    <div className="flex justify-end space-x-4 mt-8">
-                      <button
-                        onClick={() => setActiveTab('alternatives')}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center"
-                      >
-                        View Safer Alternatives
-                        <ArrowRight size={16} className="ml-2" />
-                      </button>
-                      
-                      <button
-                        onClick={executeTransaction}
-                        className={`px-4 py-2 rounded-md transition-colors flex items-center ${
-                          threatAnalysis && threatAnalysis.threatLevel === 'CRITICAL' ? 
-                          'bg-red-700 hover:bg-red-800' : 
-                          threatAnalysis && threatAnalysis.threatLevel === 'HIGH' ? 
-                          'bg-orange-600 hover:bg-orange-700' :
-                          'bg-green-600 hover:bg-green-700'
-                        }`}
-                      >
-                        Execute Transaction
-                        <ArrowRight size={16} className="ml-2" />
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-                
-                {activeTab === 'simulation' && (
-                  <motion.div
-                    key="simulation"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                  >
-                    {renderSimulation()}
-                    
-                    <div className="flex justify-end space-x-4 mt-8">
-                      <button
-                        onClick={() => setActiveTab('alternatives')}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center"
-                      >
-                        View Safer Alternatives
-                        <ArrowRight size={16} className="ml-2" />
-                      </button>
-                      
-                      <button
-                        onClick={executeTransaction}
-                        className={`px-4 py-2 rounded-md transition-colors flex items-center ${
-                          threatAnalysis && threatAnalysis.threatLevel === 'CRITICAL' ? 
-                          'bg-red-700 hover:bg-red-800' : 
-                          threatAnalysis && threatAnalysis.threatLevel === 'HIGH' ? 
-                          'bg-orange-600 hover:bg-orange-700' :
-                          'bg-green-600 hover:bg-green-700'
-                        }`}
-                      >
-                        Execute Transaction
-                        <ArrowRight size={16} className="ml-2" />
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-                
-                {activeTab === 'alternatives' && (
-                  <motion.div
-                    key="alternatives"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                  >
-                    {renderAlternatives()}
-                    
-                    <div className="flex justify-end space-x-4 mt-8">
-                      <button
-                        onClick={() => setActiveTab('analysis')}
-                        className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors flex items-center"
-                      >
-                        Back to Analysis
-                      </button>
-                      
-                      <button
-                        onClick={executeTransaction}
-                        className={`px-4 py-2 rounded-md transition-colors flex items-center ${
-                          threatAnalysis && threatAnalysis.threatLevel === 'CRITICAL' ? 
-                          'bg-red-700 hover:bg-red-800' : 
-                          threatAnalysis && threatAnalysis.threatLevel === 'HIGH' ? 
-                          'bg-orange-600 hover:bg-orange-700' :
-                          'bg-green-600 hover:bg-green-700'
-                        }`}
-                      >
-                        Execute Original Transaction
-                        <ArrowRight size={16} className="ml-2" />
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+return (
+  <div className="bg-gray-900 text-white min-h-screen">
+    <div className="max-w-6xl mx-auto px-4 py-8">
+      {/* Header Section with Connect Wallet Button */}
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-3xl font-bold flex items-center">
+          <Shield className="mr-3" size={28} />
+          TX Shield
+        </h1>
+        
+        {walletConnected ? (
+          <div className="flex items-center space-x-2">
+            <div className="flex items-center bg-gray-800 px-3 py-2 rounded-md">
+              <div className="h-3 w-3 rounded-full bg-green-500 mr-2"></div>
+              <span className="text-sm">{`${walletAddress.substring(0, 6)}...${walletAddress.substring(38)}`}</span>
             </div>
+            <NetworkDisplay 
+              isCorrectNetwork={isCorrectNetwork} 
+              networkName={networkName}
+              switchNetwork={handleNetworkSwitch}
+            />
           </div>
+        ) : (
+          <button
+            onClick={handleWalletConnect}
+            className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md transition-colors"
+          >
+            Connect Wallet
+          </button>
         )}
       </div>
+      
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {/* Transaction Input Section */}
+        <div className="col-span-2">
+          <div className="bg-gray-800 p-6 rounded-lg">
+            <h2 className="text-xl font-medium mb-6">Analyze Transaction</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Contract Address</label>
+                <input
+                  type="text"
+                  value={transaction.to}
+                  onChange={(e) => setTransaction(prev => ({ ...prev, to: e.target.value }))}
+                  placeholder="0x..."
+                  className="w-full px-3 py-2 bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Transaction Data (hex)</label>
+                <textarea
+                  value={transaction.data}
+                  onChange={(e) => setTransaction(prev => ({ ...prev, data: e.target.value }))}
+                  placeholder="0x..."
+                  rows={4}
+                  className="w-full px-3 py-2 bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Value (ETH)</label>
+                <input
+                  type="text"
+                  value={formatEthValue(parseFloat(transaction.value) / 1e18)}
+                  onChange={(e) => {
+                    try {
+                      const value = e.target.value === '' ? '0' : e.target.value;
+                      const valueWei = Math.floor(parseFloat(value) * 1e18).toString();
+                      setTransaction(prev => ({ ...prev, value: valueWei }));
+                    } catch (error) {
+                      // Invalid ETH amount, don't update
+                    }
+                  }}
+                  placeholder="0.0"
+                  className="w-full px-3 py-2 bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div className="flex space-x-4">
+                <button
+                  onClick={getTransactionFromWallet}
+                  disabled={!walletConnected || loading}
+                  className={`px-4 py-2 rounded-md flex-1 transition-colors flex items-center justify-center ${
+                    !walletConnected || loading ? 'bg-gray-600 cursor-not-allowed' : 'bg-gray-700 hover:bg-gray-600' 
+                  }`}
+                >
+                  <Activity size={16} className="mr-2" />
+                  Get From Wallet
+                </button>
+                
+                <button
+                  onClick={analyzeTransaction}
+                  disabled={loading || !transaction.to || !transaction.data}
+                  className={`px-4 py-2 rounded-md flex-1 transition-colors flex items-center justify-center ${
+                    loading || !transaction.to || !transaction.data ? 
+                    'bg-gray-600 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
+                >
+                  {loading ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <Shield size={16} className="mr-2" />
+                      Analyze Transaction
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Project Info Section */}
+        <div>
+          <div className="bg-gray-800 p-6 rounded-lg h-full flex flex-col">
+            <h2 className="text-xl font-medium mb-6">Project Info</h2>
+            
+            <div className="text-sm space-y-4 flex-grow">
+              <p>
+                TX Shield provides advanced security for crypto transactions 
+                through AI-powered threat detection and simulation.
+              </p>
+              
+              <div className="pt-2">
+                <h3 className="font-medium mb-2">Key Features:</h3>
+                <ul className="space-y-2">
+                  <li className="flex items-start">
+                    <div className="h-5 w-5 rounded-full bg-blue-600 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5 text-xs">
+                      1
+                    </div>
+                    <span>AI-powered threat detection</span>
+                  </li>
+                  <li className="flex items-start">
+                    <div className="h-5 w-5 rounded-full bg-blue-600 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5 text-xs">
+                      2
+                    </div>
+                    <span>Transaction simulation with MEV protection</span>
+                  </li>
+                  <li className="flex items-start">
+                    <div className="h-5 w-5 rounded-full bg-blue-600 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5 text-xs">
+                      3
+                    </div>
+                    <span>Secure alternative suggestions</span>
+                  </li>
+                  <li className="flex items-start">
+                    <div className="h-5 w-5 rounded-full bg-blue-600 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5 text-xs">
+                      4
+                    </div>
+                    <span>Smart contract protection layer</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            
+            <div className="mt-4 pt-4 border-t border-gray-700">
+              <div className="text-sm text-gray-400">
+                <div className="flex items-center">
+                  <DollarSign size={14} className="mr-1" />
+                  <span>Gas saved: 128.5 ETH</span>
+                </div>
+                <div className="flex items-center mt-1">
+                  <Shield size={14} className="mr-1" />
+                  <span>Threats blocked: 1,285</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* =============== NEW LOADING COMPONENT =============== */}
+      {/* LoadingState Component - Show during analysis */}
+      {loading && (
+        <LoadingState 
+          stage={analysisStage} 
+          progress={analysisProgress}
+        />
+      )}
+      
+      {/* =============== NEW RISK DIALOG COMPONENT =============== */}
+      {/* RiskConfirmationDialog - Show for high-risk transactions */}
+      <RiskConfirmationDialog
+        isOpen={showRiskDialog}
+        onClose={() => setShowRiskDialog(false)}
+        onConfirm={() => {
+          setShowRiskDialog(false);
+          executeTransaction();
+        }}
+        threatLevel={threatAnalysis?.threatLevel || 'HIGH'}
+        details={riskDialogDetails}
+      />
+      
+      {/* Results Section */}
+      {(threatAnalysis || simulation) && (
+        <div>
+          <div className="bg-gray-800 p-6 rounded-lg">
+            <div className="flex border-b border-gray-700 mb-6">
+              <button
+                className={`px-4 py-2 border-b-2 ${
+                  activeTab === 'analysis' ? 
+                  'border-blue-500 text-blue-500' : 
+                  'border-transparent text-gray-400'
+                }`}
+                onClick={() => setActiveTab('analysis')}
+              >
+                Threat Analysis
+              </button>
+              <button
+                className={`px-4 py-2 border-b-2 ${
+                  activeTab === 'simulation' ? 
+                  'border-blue-500 text-blue-500' : 
+                  'border-transparent text-gray-400'
+                }`}
+                onClick={() => setActiveTab('simulation')}
+              >
+                Simulation Results
+              </button>
+              <button
+                className={`px-4 py-2 border-b-2 ${
+                  activeTab === 'alternatives' ? 
+                  'border-blue-500 text-blue-500' : 
+                  'border-transparent text-gray-400'
+                }`}
+                onClick={() => setActiveTab('alternatives')}
+              >
+                Safer Alternatives
+              </button>
+            </div>
+            
+            <AnimatePresence mode="wait">
+              {activeTab === 'analysis' && (
+                <motion.div
+                  key="analysis"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  {/* =============== NEW MEV PROTECTION UI WITH TOOLTIPS =============== */}
+                  {threatAnalysis && threatAnalysis.threatLevel !== 'SAFE' && simulation?.mevExposure && (
+                    <div className="bg-gray-800 p-4 rounded-lg mb-6">
+                      <h3 className="font-medium mb-2">
+                        <Tooltip content={DeFiGlossary.MEV}>
+                          MEV Protection
+                        </Tooltip>
+                      </h3>
+                      
+                      <div className="text-sm text-gray-400">
+                        This transaction might be vulnerable to&nbsp;
+                        <Tooltip content={DeFiGlossary["Front-running"]}>
+                          front-running
+                        </Tooltip>
+                        &nbsp;or&nbsp;
+                        <Tooltip content={DeFiGlossary["Sandwich Attack"]}>
+                          sandwich attacks
+                        </Tooltip>.
+                      </div>
+                      
+                      <div className="mt-2">
+                        <Tooltip 
+                          content="Setting a reasonable slippage tolerance helps protect your transaction from price fluctuations and MEV attacks."
+                          width="wide"
+                        >
+                          <div className="flex items-center text-sm">
+                            <span>Slippage Tolerance</span>
+                          </div>
+                        </Tooltip>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Original Threat Indicator */}
+                  {renderThreatIndicator()}
+                  {renderThreatDetails()}
+                  {renderRecommendations()}
+                  {isCorrectNetwork && renderSecureContract()}
+                  
+                  {/* =============== NEW ADVANCED ANALYSIS COMPONENT =============== */}
+                  {threatAnalysis && simulation && (
+                    <AdvancedTransactionAnalysis
+                      analysisResult={{
+                        txType: threatAnalysis.details?.transactionType || 'UNKNOWN',
+                        description: threatAnalysis.details?.llmAnalysis?.reasoning || 'Transaction analysis',
+                        securityScore: Math.round(100 - (threatAnalysis.confidence * 100)),
+                        riskLevel: threatAnalysis.threatLevel,
+                        riskBreakdown: {
+                          contractSecurity: Math.round(threatAnalysis.details?.mlScore * 25 || 0),
+                          transactionSpecific: threatAnalysis.details?.signatureMatches?.length > 0 ? 15 : 5,
+                          userTrust: 10,
+                          externalFactors: 5,
+                          implementation: threatAnalysis.details?.mlScore > 0.5 ? 15 : 5,
+                        },
+                        details: {
+                          protocol: simulation.details?.protocol || 'Unknown',
+                          // Add more details based on your transaction data
+                        },
+                        flags: {
+                          riskFlags: threatAnalysis.mitigationSuggestions || [],
+                          protectiveFlags: [],
+                        },
+                        recommendations: threatAnalysis.mitigationSuggestions.map((suggestion, index) => ({
+                          type: 'SECURITY',
+                          title: `Recommendation ${index + 1}`,
+                          description: suggestion,
+                          actionable: index === 0, // Make first suggestion actionable
+                          priority: index === 0 ? 'high' : 'medium',
+                        })),
+                      }}
+                      onApplyRecommendation={(recommendation) => {
+                        // Handle recommendation application
+                        console.log('Applying recommendation:', recommendation);
+                        // For example, this could modify the transaction data
+                      }}
+                    />
+                  )}
+
+                  <div className="flex justify-end space-x-4 mt-8">
+                    <button
+                      onClick={() => setActiveTab('alternatives')}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center"
+                    >
+                      View Safer Alternatives
+                      <ArrowRight size={16} className="ml-2" />
+                    </button>
+                    
+                    {/* =============== UPDATED EXECUTE BUTTON =============== */}
+                    <button
+                      onClick={executeTransactionWithConfirmation} // Use the new confirmation wrapper
+                      className={`px-4 py-2 rounded-md transition-colors flex items-center ${
+                        threatAnalysis && threatAnalysis.threatLevel === 'CRITICAL' ? 
+                        'bg-red-700 hover:bg-red-800' : 
+                        threatAnalysis && threatAnalysis.threatLevel === 'HIGH' ? 
+                        'bg-orange-600 hover:bg-orange-700' :
+                        'bg-green-600 hover:bg-green-700'
+                      }`}
+                    >
+                      Execute Transaction
+                      <ArrowRight size={16} className="ml-2" />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+              
+              {activeTab === 'simulation' && (
+                <motion.div
+                  key="simulation"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  {renderSimulation()}
+                  
+                  <div className="flex justify-end space-x-4 mt-8">
+                    <button
+                      onClick={() => setActiveTab('alternatives')}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center"
+                    >
+                      View Safer Alternatives
+                      <ArrowRight size={16} className="ml-2" />
+                    </button>
+                    
+                    <button
+                      onClick={executeTransactionWithConfirmation} // Use the new confirmation wrapper
+                      className={`px-4 py-2 rounded-md transition-colors flex items-center ${
+                        threatAnalysis && threatAnalysis.threatLevel === 'CRITICAL' ? 
+                        'bg-red-700 hover:bg-red-800' : 
+                        threatAnalysis && threatAnalysis.threatLevel === 'HIGH' ? 
+                        'bg-orange-600 hover:bg-orange-700' :
+                        'bg-green-600 hover:bg-green-700'
+                      }`}
+                    >
+                      Execute Transaction
+                      <ArrowRight size={16} className="ml-2" />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+              
+              {activeTab === 'alternatives' && (
+                <motion.div
+                  key="alternatives"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  {renderAlternatives()}
+                  
+                  <div className="flex justify-end space-x-4 mt-8">
+                    <button
+                      onClick={() => setActiveTab('analysis')}
+                      className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors flex items-center"
+                    >
+                      Back to Analysis
+                    </button>
+                    
+                    <button
+                      onClick={executeTransactionWithConfirmation} // Use the new confirmation wrapper
+                      className={`px-4 py-2 rounded-md transition-colors flex items-center ${
+                        threatAnalysis && threatAnalysis.threatLevel === 'CRITICAL' ? 
+                        'bg-red-700 hover:bg-red-800' : 
+                        threatAnalysis && threatAnalysis.threatLevel === 'HIGH' ? 
+                        'bg-orange-600 hover:bg-orange-700' :
+                        'bg-green-600 hover:bg-green-700'
+                      }`}
+                    >
+                      Execute Original Transaction
+                      <ArrowRight size={16} className="ml-2" />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      )}
     </div>
-  );
+  </div>
+);
 };
 
 export default TransactionAnalyzer;
