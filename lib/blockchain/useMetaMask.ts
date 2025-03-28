@@ -44,11 +44,27 @@ export const BLOCK_EXPLORERS = {
   [CHAIN_ID.OPTIMISM]: 'https://optimistic.etherscan.io',
 };
 
+// Define the return type of the useMetaMask hook
+export interface MetaMaskHookResult {
+  account: string | null;
+  chainId: number | null;
+  isCorrectNetwork: boolean;
+  networkName: string;
+  isConnecting: boolean;
+  error: string | null;
+  connect: () => Promise<boolean>;
+  disconnect: () => void; // Added disconnect method to the interface
+  switchNetwork: (chainId: number) => Promise<boolean>;
+  switchToSepolia: () => Promise<boolean>;
+  getProvider: () => ethers.providers.Web3Provider | null;
+  getSigner: () => ethers.providers.JsonRpcSigner | null;
+}
+
 /**
  * Custom hook for MetaMask integration
  * Handles wallet connection, network switching, and account tracking
  */
-export function useMetaMask() {
+export function useMetaMask(): MetaMaskHookResult {
   // State variables
   const [account, setAccount] = useState<string | null>(null);
   const [chainId, setChainId] = useState<number | null>(null);

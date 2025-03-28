@@ -312,6 +312,7 @@ const handleNetworkSwitch = async () => {
   // Analyze transaction
 // Analyze transaction
 // Update your analyzeTransaction function with better error handling for JSON parsing
+// Fix for analyzeTransaction function
 const analyzeTransaction = async () => {
   if (!transaction.to || !transaction.data) {
     alert('Please provide transaction details');
@@ -359,22 +360,28 @@ const analyzeTransaction = async () => {
       
       console.log('Threat check status:', threatResponse.status);
       
-      // Try to get text response first to debug
-      const responseText = await threatResponse.text();
-      console.log('Response text length:', responseText.length);
-      
-      if (responseText.trim() === '') {
-        console.error('Empty response from server');
+      // Check response status first
+      if (!threatResponse.ok) {
+        console.warn(`API returned status ${threatResponse.status}`);
         setThreatAnalysis(createFallbackThreatAnalysis(transaction));
       } else {
-        try {
-          // Parse the text as JSON
-          threatResult = JSON.parse(responseText);
-          setThreatAnalysis(threatResult);
-        } catch (jsonError) {
-          console.error('JSON parsing error:', jsonError);
-          console.error('Raw response:', responseText);
+        // Try to get text response first to debug
+        const responseText = await threatResponse.text();
+        console.log('Response text length:', responseText.length);
+        
+        if (!responseText || responseText.trim() === '') {
+          console.warn('Empty response from server, using fallback data');
           setThreatAnalysis(createFallbackThreatAnalysis(transaction));
+        } else {
+          try {
+            // Parse the text as JSON
+            threatResult = JSON.parse(responseText);
+            setThreatAnalysis(threatResult);
+          } catch (jsonError) {
+            console.error('JSON parsing error:', jsonError);
+            console.error('Raw response:', responseText);
+            setThreatAnalysis(createFallbackThreatAnalysis(transaction));
+          }
         }
       }
     } catch (threatError) {
@@ -393,22 +400,28 @@ const analyzeTransaction = async () => {
       
       console.log('Simulation status:', simulationResponse.status);
       
-      // Try to get text response first to debug
-      const responseText = await simulationResponse.text();
-      console.log('Response text length:', responseText.length);
-      
-      if (responseText.trim() === '') {
-        console.error('Empty response from server');
+      // Check response status first
+      if (!simulationResponse.ok) {
+        console.warn(`API returned status ${simulationResponse.status}`);
         setSimulation(createFallbackSimulation(transaction));
       } else {
-        try {
-          // Parse the text as JSON
-          simulationResult = JSON.parse(responseText);
-          setSimulation(simulationResult);
-        } catch (jsonError) {
-          console.error('JSON parsing error:', jsonError);
-          console.error('Raw response:', responseText);
+        // Try to get text response first to debug
+        const responseText = await simulationResponse.text();
+        console.log('Response text length:', responseText.length);
+        
+        if (!responseText || responseText.trim() === '') {
+          console.warn('Empty response from server, using fallback data');
           setSimulation(createFallbackSimulation(transaction));
+        } else {
+          try {
+            // Parse the text as JSON
+            simulationResult = JSON.parse(responseText);
+            setSimulation(simulationResult);
+          } catch (jsonError) {
+            console.error('JSON parsing error:', jsonError);
+            console.error('Raw response:', responseText);
+            setSimulation(createFallbackSimulation(transaction));
+          }
         }
       }
     } catch (simulationError) {
@@ -419,7 +432,7 @@ const analyzeTransaction = async () => {
     // Complete
     simulateProgress('finalizing', 100);
     
-    // The rest of the function remains the same...
+    // Use the fallback data if the API calls failed
     const threatResultValue = threatResult || createFallbackThreatAnalysis(transaction);
     
     // Show risk dialog for high-risk transactions
@@ -1189,7 +1202,11 @@ return (
           <div className="flex items-center space-x-2">
             <div className="flex items-center bg-gray-800 px-3 py-2 rounded-md">
               <div className="h-3 w-3 rounded-full bg-green-500 mr-2"></div>
-              <span className="text-sm">{`${walletAddress.substring(0, 6)}...${walletAddress.substring(38)}`}</span>
+              <span className="text-sm">
+                {walletAddress ? 
+                  `${walletAddress.substring(0, 6)}...${walletAddress.substring(38)}` : 
+                  'Connected'}
+              </span>
             </div>
             <NetworkDisplay 
               isCorrectNetwork={isCorrectNetwork} 
