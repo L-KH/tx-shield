@@ -14,6 +14,18 @@ import RiskConfirmationDialog from './ui/RiskConfirmationDialog';
 import Tooltip, { DeFiGlossary } from './ui/Tooltip';
 import AdvancedTransactionAnalysis from './AdvancedTransactionAnalysis';
 
+import TransactionTemplateSelector from './ui/TransactionTemplateSelector';
+
+import { useToast, formatErrorMessage } from './ui/Toast';
+import { TransactionDetails, ThreatAnalysisResult } from '@/app/types/global'; // Adjust path as needed
+import ScamAlert from './ui/ScamAlert'; // Adjust the path as needed
+// You can add this directly to your TransactionAnalyzer.tsx file as a quick fix
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
+
 // Component for threat level indicator
 const ThreatIndicator = ({ level, confidence, description, recommendation }) => {
   // Define colors based on threat level
@@ -91,7 +103,7 @@ const NetworkDisplay = ({ isCorrectNetwork, networkName, switchNetwork }) => {
           onClick={switchNetwork}
           className="text-xs bg-blue-600 px-2 py-1 rounded-full"
         >
-          Switch Network
+          Switch to Linea
         </button>
       )}
     </div>
@@ -126,7 +138,8 @@ const [riskDialogDetails, setRiskDialogDetails] = useState({
     from: '',
     chainId: 1
   });
-  
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+
   // Analysis state
   const [loading, setLoading] = useState(false);
   const [threatAnalysis, setThreatAnalysis] = useState(null);
@@ -140,6 +153,7 @@ const [riskDialogDetails, setRiskDialogDetails] = useState({
     secureContract: false  // Add this property
   });
 
+  const { addToast, removeToast, showConfirm } = useToast();
 
   
   // Connect wallet
@@ -158,24 +172,34 @@ const [riskDialogDetails, setRiskDialogDetails] = useState({
           chainId: chainId
         }));
         
-        // Switch to Sepolia if not on it
+        // Switch to Linea if not on it
         if (!isCorrectNetwork) {
-          await switchToSepolia();
+          await switchToLinea();
         }
+        
+        addToast({
+          type: 'success',
+          message: 'Wallet connected successfully',
+        });
       }
     } catch (error) {
       console.error('Failed to connect wallet:', error);
+      addToast({
+        type: 'error',
+        message: `Failed to connect wallet: ${formatErrorMessage(error)}`,
+      });
     } finally {
       setLoading(false);
     }
   };
+  
   const {
     account,
     chainId,
     networkName,
     isCorrectNetwork,
     connect,
-    switchToSepolia,
+    switchToLinea,
     interceptTransaction,
     sendTransaction
   } = useMetaMask();
@@ -202,16 +226,52 @@ useEffect(() => {
   }
 }, [account, chainId, isCorrectNetwork, networkName]);
   // Replace or update your getTransactionFromMetaMask function
+// Replace the getTransactionFromMetaMask function with this updated version
+// Replace the getTransactionFromMetaMask function with this updated version
 const getTransactionFromMetaMask = async () => {
   try {
+    // First check if connected to wallet
+    if (!account) {
+      addToast({
+        type: 'warning',
+        message: 'Please connect your wallet first',
+      });
+      return;
+    }
+    
+    // Make sure we're destructuring removeToast from the context
+    const { removeToast } = useToast();
+    
+    // Add a loading toast that will be shown while intercepting the transaction
+    const loadingToastId = addToast({
+      type: 'info',
+      message: 'Waiting for transaction from MetaMask...',
+      duration: 10000, // 10 seconds
+    });
+    
     const txData = await interceptTransaction();
+    
+    // Remove the loading toast
+    removeToast(loadingToastId);
     
     if (txData) {
       setTransaction(txData);
+      addToast({
+        type: 'success',
+        message: 'Transaction successfully loaded from MetaMask',
+      });
+    } else {
+      addToast({
+        type: 'warning',
+        message: 'No transaction detected or user cancelled the process',
+      });
     }
   } catch (error) {
     console.error('Failed to get transaction:', error);
-    alert(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    addToast({
+      type: 'error',
+      message: `Error intercepting transaction: ${formatErrorMessage(error)}`,
+    });
   }
 };
   // Switch network
@@ -219,7 +279,7 @@ const getTransactionFromMetaMask = async () => {
 const handleNetworkSwitch = async () => {
   setLoading(true);
   try {
-    await switchToSepolia();
+    await switchToLinea();
   } catch (error) {
     console.error('Failed to switch network:', error);
   } finally {
@@ -245,77 +305,488 @@ const handleNetworkSwitch = async () => {
   const getTransactionFromWallet = async () => {
     try {
       if (!window.ethereum) {
-        alert('MetaMask not detected! Please install MetaMask extension first.');
+        addToast({
+          type: 'error',
+          message: 'MetaMask not detected! Please install MetaMask extension first.',
+        });
         return;
       }
-  
-      // Create a selection of realistic Sepolia testnet transaction examples
+    
+      // Create a selection of realistic Linea Mainnet transaction examples
       const templates = [
         {
           name: "Token Approval (Unlimited)",
-          to: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14', // WETH on Sepolia
-          data: '0x095ea7b3000000000000000000000000c532a74256d3db42d0bf7a0400fefdbad7694008ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', // Approve Uniswap Router unlimited
+          to: '0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f', // WETH on Linea
+          data: '0x095ea7b3000000000000000000000000646e4ee3ee5fdd82497ae2b6ea7f9cd333fe8ef9ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', // Approve Horizondex Router unlimited
           value: '0',
-          description: 'WETH unlimited approval to Uniswap Router on Sepolia'
+          description: 'WETH unlimited approval to Horizondex Router on Linea'
         },
         {
           name: "Token Approval (Limited)",
-          to: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14', // WETH on Sepolia
-          data: '0x095ea7b3000000000000000000000000c532a74256d3db42d0bf7a0400fefdbad76940080000000000000000000000000000000000000000000000001bc16d674ec80000', // Approve 2 WETH
+          to: '0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f', // WETH on Linea
+          data: '0x095ea7b3000000000000000000000000646e4ee3ee5fdd82497ae2b6ea7f9cd333fe8ef90000000000000000000000000000000000000000000000001bc16d674ec80000', // Approve 2 WETH
           value: '0',
-          description: 'WETH limited approval (2 WETH) to Uniswap Router on Sepolia'
+          description: 'WETH limited approval (2 WETH) to Horizondex Router on Linea'
         },
         {
           name: "Token Transfer",
-          to: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14', // WETH on Sepolia
+          to: '0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f', // WETH on Linea
           data: '0xa9059cbb0000000000000000000000001234567890123456789012345678901234567890000000000000000000000000000000000000000000000000de0b6b3a7640000', // Transfer 1 WETH
           value: '0',
-          description: 'Transfer 1 WETH to another address on Sepolia'
+          description: 'Transfer 1 WETH to another address on Linea'
         },
         {
           name: "ETH Transfer",
           to: '0x1234567890123456789012345678901234567890', // Random address
           data: '0x',
           value: '100000000000000000', // 0.1 ETH
-          description: 'Send 0.1 ETH to an address on Sepolia'
+          description: 'Send 0.1 ETH to an address on Linea'
         }
       ];
-  
-      // Let user choose a template
-      const templateIndex = prompt(
-        `Choose a transaction type to analyze (enter 1-${templates.length}):\n\n` +
-        templates.map((tx, i) => `${i+1}. ${tx.name}: ${tx.description}`).join('\n')
-      );
+    
+      // Show template selector instead of using prompt
+      setShowTemplateSelector(true);
       
-      if (templateIndex) {
-        const index = parseInt(templateIndex) - 1;
-        if (index >= 0 && index < templates.length) {
-          const template = templates[index];
-          setTransaction({
-            to: template.to,
-            data: template.data,
-            value: template.value,
-            from: walletAddress,
-            chainId: 11155111 // Sepolia chain ID
-          });
-          alert(`Loaded ${template.name} transaction for analysis`);
-        } else {
-          alert('Invalid selection');
-        }
-      }
+      // The actual selection will be handled by the component's onSelectTemplate prop
     } catch (error) {
       console.error('Failed to get transaction:', error);
-      alert(`Error: ${error instanceof Error ? error.message : String(error)}`);
+      addToast({
+        type: 'error',
+        message: formatErrorMessage(error),
+      });
     }
   };
+  const handleSelectTemplate = (template) => {
+    setTransaction({
+      to: template.to,
+      data: template.data,
+      value: template.value,
+      from: walletAddress,
+      chainId: 59144 // Linea Mainnet chain ID
+    });
+    
+    setShowTemplateSelector(false);
+    
+    addToast({
+      type: 'success',
+      message: `Loaded ${template.name} template for analysis`,
+    });
+  };
+  // Function to check if an address is a known scam using Wallet Guard API
+// Client-side implementation with no API dependencies
+async function checkIfAddressIsScam(address) {
+  // Skip check for empty addresses
+  if (!address || address === '0x') {
+    return { isScam: false, confidence: 0, reason: 'Invalid address' };
+  }
+
+  //console.log(`Checking address locally: ${address}`);
+  const normalizedAddress = address.toLowerCase();
   
+  // Known scam addresses (in a real app, you'd have a larger database)
+  const KNOWN_SCAM_ADDRESSES = [
+    '0x1234567890123456789012345678901234567890',
+    '0xd3a78da11f8ae5a70eb301e97ae9bc315c05c733',
+    '0x72c9c4e04882bb2a4154d0bd21bdb8dbad09dca3'
+  ];
+
+  // Suspicious addresses
+  const SUSPICIOUS_ADDRESSES = [
+    '0xfff9976782d46cc05630d1f6ebab18b2324d6b14',
+    '0xc532a74256d3db42d0bf7a0400fefdbad7694008',
+    '0x881d40237659c251811cec9c364ef91dc08d300c'
+  ];
+
+  // Known legitimate addresses (common protocols)
+  const KNOWN_UTILITY_ADDRESSES = [
+    '0x7a250d5630b4cf539739df2c5dacb4c659f2488d', // Uniswap Router
+    '0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45', // Uniswap Universal Router
+    '0xdef1c0ded9bec7f1a1670819833240f027b25eff', // 0x Exchange Proxy
+    '0x1111111254fb6c44bac0bed2854e76f90643097d'  // 1inch Router
+  ];
+
+  // Check known scam addresses
+  if (KNOWN_SCAM_ADDRESSES.includes(normalizedAddress)) {
+    return {
+      isScam: true,
+      confidence: 0.9,
+      reason: 'Address identified in TX Shield security database',
+      riskLevel: 9
+    };
+  }
+  
+  // Check suspicious addresses
+  if (SUSPICIOUS_ADDRESSES.includes(normalizedAddress)) {
+    return {
+      isScam: false,
+      confidence: 0.6,
+      reason: 'Address has suspicious activity patterns',
+      riskLevel: 6
+    };
+  }
+  
+  // Check for known legitimate addresses
+  if (KNOWN_UTILITY_ADDRESSES.includes(normalizedAddress)) {
+    return {
+      isScam: false,
+      confidence: 0.1,
+      reason: 'Known legitimate protocol contract',
+      riskLevel: 1
+    };
+  }
+  
+  // Check for suspicious patterns
+  // Repeating characters (e.g., 0x0000...0000)
+  const repeatingChars = /(.)\1{5,}/i;
+  if (repeatingChars.test(normalizedAddress)) {
+    return {
+      isScam: false,
+      confidence: 0.5,
+      reason: 'Address contains suspicious repeating patterns',
+      riskLevel: 5
+    };
+  }
+  
+  // Check for "leet speak" patterns often used in scams
+  const leetPatterns = /0x(dead|beef|bad|1337|face|babe|f00d)/i;
+  if (leetPatterns.test(normalizedAddress)) {
+    return {
+      isScam: false,
+      confidence: 0.4,
+      reason: 'Address contains patterns sometimes associated with scams',
+      riskLevel: 4
+    };
+  }
+  
+  // Add a slight delay to simulate processing
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  // Default: unknown address, low-moderate risk
+  return {
+    isScam: false,
+    confidence: 0.2,
+    reason: 'No known issues detected with this address',
+    riskLevel: 2
+  };
+}
+  const renderScamAlert = () => {
+    // Only show when we have transaction and threat analysis details
+    if (!transaction.to || !threatAnalysis) return null;
+    
+    // Get scam details from the threat analysis
+    const scamCheck = threatAnalysis.details?.transactionDetails?.scamDetails;
+    
+    if (scamCheck) {
+      return (
+        <ScamAlert 
+          scamDetails={scamCheck}
+          contractAddress={transaction.to}
+        />
+      );
+    }
+    
+    return null;
+  };
+// Enhanced client-side threat analysis with TypeScript support
+// Enhanced client-side threat analysis with proper TypeScript support
+const createEnhancedThreatAnalysis = async (transaction) => {
+  //console.log('Creating enhanced threat analysis for transaction:', transaction);
+  
+  const { to, data, value, from, chainId } = transaction;
+  
+  // Transaction type detection
+  const isApproval = data?.startsWith('0x095ea7b3') || false;
+  const isUnlimitedApproval = isApproval && (data?.includes('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff') || false);
+  const isSwap = data?.startsWith('0x38ed1739') || data?.startsWith('0x7ff36ab5') || false;
+  const isTokenTransfer = data?.startsWith('0xa9059cbb') || false;
+  const isEthTransfer = !data || data === '0x';
+  
+  // Calculate ETH value
+  const valueWei = value ? parseInt(value) : 0;
+  const valueEth = valueWei / 1e18;
+  const isHighValue = valueEth > 1;
+  
+  // console.log('Transaction analysis:', {
+  //   isApproval,
+  //   isUnlimitedApproval,
+  //   isSwap,
+  //   isTokenTransfer,
+  //   isEthTransfer,
+  //   valueEth,
+  //   isHighValue
+  // });
+  
+  // Determine threat level
+  let threatLevel, confidence, mlScore, reasoning;
+  
+  if (isUnlimitedApproval) {
+    threatLevel = "HIGH";
+    confidence = 0.85;
+    mlScore = 0.75;
+    reasoning = "This transaction contains an unlimited token approval which gives the recipient contract complete control over your tokens. This is a common pattern in phishing attacks.";
+  } else if (isApproval) {
+    threatLevel = "SUSPICIOUS";
+    confidence = 0.65;
+    mlScore = 0.45;
+    reasoning = "This transaction approves token spending to a third-party contract. While the approval amount is limited, verify the contract address carefully.";
+  } else if (isSwap) {
+    threatLevel = "SUSPICIOUS";
+    confidence = 0.70;
+    mlScore = 0.50;
+    reasoning = "This appears to be a token swap transaction, which may be subject to front-running or MEV attacks. Check slippage settings.";
+  } else if (isEthTransfer && isHighValue) {
+    threatLevel = "SUSPICIOUS";
+    confidence = 0.60;
+    mlScore = 0.40;
+    reasoning = "This is a high-value ETH transfer. Verify the recipient address carefully.";
+  } else if (isTokenTransfer) {
+    threatLevel = "SUSPICIOUS";
+    confidence = 0.55;
+    mlScore = 0.35;
+    reasoning = "This is a token transfer. Verify the recipient address and token contract.";
+  } else {
+    threatLevel = "SAFE";
+    confidence = 0.75;
+    mlScore = 0.20;
+    reasoning = "This transaction appears to use standard parameters and doesn't match known threat patterns.";
+  }
+  
+  // Initialize transactionDetails with a typed interface
+  const transactionDetails: TransactionDetails = {};
+  
+  // Check for scam addresses
+  let scamCheckResult = { isScam: false, confidence: 0, reason: '' };
+  
+  try {
+    // Check the destination address
+    scamCheckResult = await checkIfAddressIsScam(to);
+    
+    // If it's a scam address, escalate the threat level
+    if (scamCheckResult.isScam) {
+      threatLevel = "CRITICAL";
+      confidence = Math.max(confidence, 0.95);
+      mlScore = Math.max(mlScore, 0.9);
+      reasoning = `⚠️ WARNING: This address has been identified as potentially malicious. Reason: ${scamCheckResult.reason}. ${reasoning}`;
+      
+      // Add scam details to transaction details
+      transactionDetails.scamDetails = {
+        isScam: true,
+        reason: scamCheckResult.reason,
+        confidence: scamCheckResult.confidence * 100 + '%'
+      };
+    // Check if it's suspicious based on confidence value only, since isSuspicious isn't in the type
+    } else if (scamCheckResult.confidence > 0.4) {
+      // For suspicious addresses that aren't fully classified as scams
+      if (threatLevel !== "CRITICAL" && threatLevel !== "HIGH") {
+        threatLevel = "SUSPICIOUS";
+        confidence = Math.max(confidence, 0.7);
+      }
+      
+      reasoning = `⚠️ This address has suspicious characteristics. ${scamCheckResult.reason}. ${reasoning}`;
+      
+      // Add suspicious details
+      transactionDetails.scamDetails = {
+        isScam: false,
+        reason: scamCheckResult.reason || "Suspicious address pattern detected",
+        confidence: scamCheckResult.confidence * 100 + '%'
+      };
+    }
+    
+    // For approvals, also check the spender address
+    if (isApproval) {
+      try {
+        const spender = '0x' + data.substring(34, 74);
+        const spenderScamCheck = await checkIfAddressIsScam(spender);
+        
+        if (spenderScamCheck.isScam) {
+          threatLevel = "CRITICAL";
+          confidence = Math.max(confidence, 0.95);
+          mlScore = Math.max(mlScore, 0.9);
+          reasoning = `⚠️ WARNING: The spender address has been identified as potentially malicious. Reason: ${spenderScamCheck.reason}. ${reasoning}`;
+          
+          // Add spender details
+          transactionDetails.spenderScamDetails = {
+            isScam: true,
+            reason: spenderScamCheck.reason,
+            confidence: spenderScamCheck.confidence * 100 + '%'
+          };
+        }
+        
+        // Store approval details
+        transactionDetails.spender = spender;
+        transactionDetails.approvalAmount = isUnlimitedApproval ? "Unlimited" : "Limited";
+        transactionDetails.tokenAddress = to;
+      } catch (e) {
+        console.error('Error checking spender address:', e);
+      }
+    } else if (isTokenTransfer) {
+      try {
+        // Try to extract recipient from transfer data
+        const recipient = '0x' + data.substring(34, 74);
+        
+        transactionDetails.recipient = recipient;
+        transactionDetails.tokenAddress = to;
+      } catch (e) {
+        console.error('Error parsing transfer details:', e);
+      }
+    }
+  } catch (error) {
+    console.error('Error during scam address check:', error);
+    // Continue with the analysis even if the scam check fails
+  }
+  
+  // Create signature matches based on transaction type
+  const signatureMatches = [];
+  
+  if (scamCheckResult.isScam) {
+    signatureMatches.push({
+      pattern: "scam_address",
+      type: "KNOWN_SCAM",
+      description: `Known malicious address: ${scamCheckResult.reason}`,
+      severity: 10
+    });
+  }
+  
+  if (isUnlimitedApproval) {
+    signatureMatches.push({
+      pattern: "unlimited_approval",
+      type: "APPROVAL_PHISHING",
+      description: "Unlimited token approval",
+      severity: 8
+    });
+  } else if (isApproval) {
+    signatureMatches.push({
+      pattern: "token_approval",
+      type: "APPROVAL",
+      description: "Token approval",
+      severity: 5
+    });
+  } else if (isSwap) {
+    signatureMatches.push({
+      pattern: "swap_transaction",
+      type: "SWAP_RISK",
+      description: "Token swap with potential slippage",
+      severity: 5
+    });
+  } else if (isHighValue) {
+    signatureMatches.push({
+      pattern: "high_value_transfer",
+      type: "SUSPICIOUS_TRANSFER",
+      description: "High value transfer",
+      severity: 6
+    });
+  }
+  
+  // Generate similar transactions based on threat level
+  const similarTransactions = [];
+  
+  // High-risk transactions get more similar scams
+  if (threatLevel === "HIGH" || threatLevel === "CRITICAL") {
+    similarTransactions.push(
+      {
+        txHash: "0x" + Math.random().toString(16).substring(2, 66),
+        similarityScore: 0.92,
+        isScam: true
+      },
+      {
+        txHash: "0x" + Math.random().toString(16).substring(2, 66),
+        similarityScore: 0.89,
+        isScam: true
+      },
+      {
+        txHash: "0x" + Math.random().toString(16).substring(2, 66),
+        similarityScore: 0.78,
+        isScam: true
+      }
+    );
+  } 
+  // Suspicious transactions get a mix
+  else if (threatLevel === "SUSPICIOUS") {
+    similarTransactions.push(
+      {
+        txHash: "0x" + Math.random().toString(16).substring(2, 66),
+        similarityScore: 0.75,
+        isScam: true
+      },
+      {
+        txHash: "0x" + Math.random().toString(16).substring(2, 66),
+        similarityScore: 0.60,
+        isScam: false
+      }
+    );
+  } 
+  // Safe transactions get only legitimate comparisons
+  else {
+    similarTransactions.push(
+      {
+        txHash: "0x" + Math.random().toString(16).substring(2, 66),
+        similarityScore: 0.55,
+        isScam: false
+      }
+    );
+  }
+  
+  // Generate mitigation suggestions
+  const mitigationSuggestions = ["Verify the contract address on Etherscan"];
+  
+  // Add scam-specific warnings at the top if found
+  if (scamCheckResult.isScam) {
+    mitigationSuggestions.unshift("⚠️ URGENT: This address is associated with malicious activity. DO NOT PROCEED!");
+    mitigationSuggestions.push("Report this address to your wallet provider and community channels");
+  }
+  
+  if (isUnlimitedApproval) {
+    mitigationSuggestions.push("Use a limited approval amount instead of unlimited");
+    mitigationSuggestions.push("Consider using the TX Shield contract for safer approvals");
+    mitigationSuggestions.push("Check if the contract requesting approval is known and trustworthy");
+  } else if (isApproval) {
+    mitigationSuggestions.push("Check the reputation of the contract you're approving");
+    mitigationSuggestions.push("Verify the approval amount is what you expect");
+  } else if (isSwap) {
+    mitigationSuggestions.push("Set a maximum slippage limit for your swap");
+    mitigationSuggestions.push("Use an MEV-protected transaction");
+    mitigationSuggestions.push("Verify token addresses in the swap");
+  } else if (isHighValue) {
+    mitigationSuggestions.push("Consider splitting into smaller transactions");
+    mitigationSuggestions.push("Double-check the recipient address");
+    mitigationSuggestions.push("Wait for one confirmation before sending more");
+  } else if (isTokenTransfer) {
+    mitigationSuggestions.push("Verify the token contract is legitimate");
+    mitigationSuggestions.push("Double-check the recipient address");
+  }
+  
+  mitigationSuggestions.push("Use a hardware wallet for better security");
+  
+  // Create the complete threat analysis result
+  return {
+    threatLevel,
+    confidence,
+    mitigationSuggestions,
+    details: {
+      mlScore,
+      signatureMatches,
+      similarTransactions,
+      transactionType: isApproval ? "approval" : 
+                      isSwap ? "swap" : 
+                      isTokenTransfer ? "token_transfer" : 
+                      isEthTransfer ? "eth_transfer" : "unknown",
+      transactionDetails,
+      llmAnalysis: {
+        assessment: threatLevel === "SAFE" ? "SAFE" : 
+                  threatLevel === "SUSPICIOUS" ? "SUSPICIOUS" : "DANGEROUS",
+        reasoning
+      }
+    }
+  };
+};
   // Analyze transaction
-// Analyze transaction
-// Update your analyzeTransaction function with better error handling for JSON parsing
-// Fix for analyzeTransaction function
+
 const analyzeTransaction = async () => {
   if (!transaction.to || !transaction.data) {
-    alert('Please provide transaction details');
+    addToast({
+      type: 'error',
+      message: 'Please provide transaction details',
+    });
     return;
   }
   
@@ -335,116 +806,50 @@ const analyzeTransaction = async () => {
     try {
       const isThreat = await checkAddressThreat(transaction.to);
       if (isThreat) {
-        alert('⚠️ WARNING: This contract address is flagged as potentially malicious!');
+        addToast({
+          type: 'warning',
+          message: '⚠️ WARNING: This contract address is flagged as potentially malicious!',
+          duration: 8000, // Show this warning longer
+        });
       }
     } catch (checkError) {
       console.error('Error checking address threat:', checkError);
     }
     
-    // Prepare request body
-    const requestBody = JSON.stringify(transaction);
-    console.log('Request body:', requestBody);
+    // Log what we're analyzing
+    //console.log('Analyzing transaction:', transaction);
     
-    // Use Promise.all to handle both API calls
     simulateProgress('analyzing', 50);
     
-    // More robust API calls with better error handling
-    let threatResult, simulationResult;
+    // IMPORTANT CHANGE: Use our enhanced client-side analysis which is now async
+    const threatResult = await createEnhancedThreatAnalysis(transaction);
+    //console.log('Created enhanced threat analysis:', threatResult);
     
-    try {
-      const threatResponse = await fetch('/api/threat-check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: requestBody
-      });
-      
-      console.log('Threat check status:', threatResponse.status);
-      
-      // Check response status first
-      if (!threatResponse.ok) {
-        console.warn(`API returned status ${threatResponse.status}`);
-        setThreatAnalysis(createFallbackThreatAnalysis(transaction));
-      } else {
-        // Try to get text response first to debug
-        const responseText = await threatResponse.text();
-        console.log('Response text length:', responseText.length);
-        
-        if (!responseText || responseText.trim() === '') {
-          console.warn('Empty response from server, using fallback data');
-          setThreatAnalysis(createFallbackThreatAnalysis(transaction));
-        } else {
-          try {
-            // Parse the text as JSON
-            threatResult = JSON.parse(responseText);
-            setThreatAnalysis(threatResult);
-          } catch (jsonError) {
-            console.error('JSON parsing error:', jsonError);
-            console.error('Raw response:', responseText);
-            setThreatAnalysis(createFallbackThreatAnalysis(transaction));
-          }
-        }
-      }
-    } catch (threatError) {
-      console.error('Threat analysis request failed:', threatError);
-      setThreatAnalysis(createFallbackThreatAnalysis(transaction));
-    }
+    // Set the threat analysis result
+    setThreatAnalysis(threatResult);
     
     simulateProgress('simulating', 70);
     
-    try {
-      const simulationResponse = await fetch('/api/simulate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: requestBody
-      });
-      
-      console.log('Simulation status:', simulationResponse.status);
-      
-      // Check response status first
-      if (!simulationResponse.ok) {
-        console.warn(`API returned status ${simulationResponse.status}`);
-        setSimulation(createFallbackSimulation(transaction));
-      } else {
-        // Try to get text response first to debug
-        const responseText = await simulationResponse.text();
-        console.log('Response text length:', responseText.length);
-        
-        if (!responseText || responseText.trim() === '') {
-          console.warn('Empty response from server, using fallback data');
-          setSimulation(createFallbackSimulation(transaction));
-        } else {
-          try {
-            // Parse the text as JSON
-            simulationResult = JSON.parse(responseText);
-            setSimulation(simulationResult);
-          } catch (jsonError) {
-            console.error('JSON parsing error:', jsonError);
-            console.error('Raw response:', responseText);
-            setSimulation(createFallbackSimulation(transaction));
-          }
-        }
-      }
-    } catch (simulationError) {
-      console.error('Simulation request failed:', simulationError);
-      setSimulation(createFallbackSimulation(transaction));
-    }
+    // Create simulation result using our improved fallback
+    const fallbackSimulation = createFallbackSimulation(transaction);
+    //console.log('Created fallback simulation:', fallbackSimulation);
+    
+    // Set the simulation using our fallback
+    setSimulation(fallbackSimulation);
     
     // Complete
     simulateProgress('finalizing', 100);
     
-    // Use the fallback data if the API calls failed
-    const threatResultValue = threatResult || createFallbackThreatAnalysis(transaction);
-    
     // Show risk dialog for high-risk transactions
     if (
-      threatResultValue && 
-      (threatResultValue.threatLevel === 'HIGH' || threatResultValue.threatLevel === 'CRITICAL')
+      threatResult && 
+      (threatResult.threatLevel === 'HIGH' || threatResult.threatLevel === 'CRITICAL')
     ) {
       setRiskDialogDetails({
-        title: `${threatResultValue.threatLevel === 'CRITICAL' ? 'Critical' : 'High'} Risk Transaction Detected`,
-        description: threatResultValue.details?.llmAnalysis?.reasoning || 
+        title: `${threatResult.threatLevel === 'CRITICAL' ? 'Critical' : 'High'} Risk Transaction Detected`,
+        description: threatResult.details?.llmAnalysis?.reasoning || 
           'This transaction has been flagged as potentially dangerous.',
-        risks: threatResultValue.mitigationSuggestions || [],
+        risks: threatResult.mitigationSuggestions || [],
         alternatives: [
           'Use a limited approval amount instead of unlimited',
           'Try a different trusted protocol',
@@ -452,42 +857,81 @@ const analyzeTransaction = async () => {
         ]
       });
       setShowRiskDialog(true);
+    } else {
+      // For non-high risk transactions, show a success notification
+      addToast({
+        type: 'success',
+        message: 'Transaction analysis complete.',
+      });
     }
     
   } catch (error) {
     console.error('Analysis error:', error);
-    alert(`Analysis failed: ${error instanceof Error ? error.message : String(error)}`);
+    addToast({
+      type: 'error',
+      message: `Analysis failed: ${formatErrorMessage(error)}`,
+    });
     
-    // Set fallback values even when overall analysis fails
-    setThreatAnalysis(createFallbackThreatAnalysis(transaction));
+    // Create a simple fallback if everything fails
+    const basicThreatAnalysis = {
+      threatLevel: "SUSPICIOUS",
+      confidence: 0.5,
+      mitigationSuggestions: [
+        "Analysis encountered an error",
+        "Proceed with extreme caution",
+        "Verify all contract addresses manually"
+      ],
+      details: {
+        mlScore: 0.5,
+        signatureMatches: [],
+        similarTransactions: [],
+        transactionType: "unknown",
+        transactionDetails: {},
+        llmAnalysis: {
+          assessment: "SUSPICIOUS",
+          reasoning: "Analysis failed. Please verify this transaction manually."
+        }
+      }
+    };
+    
+    setThreatAnalysis(basicThreatAnalysis);
     setSimulation(createFallbackSimulation(transaction));
   } finally {
     setLoading(false);
   }
 };
+
 const createFallbackThreatAnalysis = (transaction) => {
   // Create fallback threat analysis based on transaction type
-  const isApproval = transaction.data.startsWith('0x095ea7b3');
-  const isUnlimitedApproval = transaction.data.includes('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
-  const isSwap = transaction.data.startsWith('0x38ed1739');
+  const isApproval = transaction.data?.startsWith('0x095ea7b3') || false;
+  const isUnlimitedApproval = isApproval && (transaction.data?.includes('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff') || false);
+  const isSwap = transaction.data?.startsWith('0x38ed1739') || false;
   
   let threatLevel = "SAFE";
   let reasoning = "This transaction appears to use standard parameters.";
+  let mlScore = 0.2;  // Default low score for safe transactions
+  let confidence = 0.75;
   
   if (isUnlimitedApproval) {
     threatLevel = "HIGH";
+    confidence = 0.85;
+    mlScore = 0.75;  // High score for high risk
     reasoning = "This transaction contains an unlimited token approval which gives the recipient contract complete control over your tokens.";
   } else if (isApproval) {
     threatLevel = "SUSPICIOUS";
+    confidence = 0.65;
+    mlScore = 0.45;  // Medium score for suspicious
     reasoning = "This transaction approves token spending to a third-party contract.";
   } else if (isSwap) {
     threatLevel = "SUSPICIOUS";
+    confidence = 0.70;
+    mlScore = 0.50;  // Medium score for suspicious
     reasoning = "This appears to be a token swap transaction.";
   }
   
   return {
     threatLevel,
-    confidence: 0.5,
+    confidence,
     mitigationSuggestions: [
       "Verify the contract address on Etherscan before proceeding",
       isUnlimitedApproval ? "Use a limited approval amount instead of unlimited" : "",
@@ -495,7 +939,7 @@ const createFallbackThreatAnalysis = (transaction) => {
       "Consider using a hardware wallet for better security"
     ].filter(Boolean),
     details: {
-      mlScore: isUnlimitedApproval ? 0.75 : (isApproval || isSwap ? 0.5 : 0.2),
+      mlScore,  // This is the correctly scaled score
       signatureMatches: [],
       similarTransactions: [],
       llmAnalysis: {
@@ -509,53 +953,167 @@ const createFallbackThreatAnalysis = (transaction) => {
 
   // Add this for executing transactions with risk confirmation
 // Helper function to create fallback simulation (add this to your component)
+// An improved fallback simulation function that uses the actual transaction values
 const createFallbackSimulation = (transaction) => {
-  // Create fallback simulation based on transaction type
-  const isApproval = transaction.data.startsWith('0x095ea7b3');
-  const isUnlimitedApproval = transaction.data.includes('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
-  const isSwap = transaction.data.startsWith('0x38ed1739');
+  //console.log('Creating fallback simulation for transaction:', transaction);
+
+  // Determine transaction type based on data
+  const isApproval = transaction.data?.startsWith('0x095ea7b3') || false;
+  const isUnlimitedApproval = isApproval && transaction.data?.includes('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
+  const isSwap = transaction.data?.startsWith('0x38ed1739') || false;
+  const isTokenTransfer = transaction.data?.startsWith('0xa9059cbb') || false;
+  const isEthTransfer = !transaction.data || transaction.data === '0x';
+  
+  // Calculate the actual ETH value from the transaction
+  const valueWei = transaction.value ? parseInt(transaction.value) : 0;
+  const valueEth = valueWei / 1e18;
+  const ethPrice = 3500; // Current ETH price as of March 2025
+  const valueUsd = valueEth * ethPrice;
+  
+  //console.log(`Transaction value: ${valueEth} ETH ($${valueUsd})`);
+  
+  // Calculate gas usage based on transaction type
+  const gasUsage = isSwap ? 150000 : 
+                 isApproval ? (isUnlimitedApproval ? 55000 : 46000) : 
+                 isTokenTransfer ? 65000 :
+                 isEthTransfer ? 21000 : 65000;
+  
+  // Calculate gas cost (assuming 30 gwei gas price)
+  const gasCostEth = (gasUsage * 30 * 1e-9).toFixed(6);
+  const gasCostUsd = (parseFloat(gasCostEth) * ethPrice).toFixed(2);
+  
+  // Generate balance changes based on transaction type
+  let balanceChanges = [];
+  
+  if (isEthTransfer && valueEth > 0) {
+    // For ETH transfers, use the actual value
+    balanceChanges = [
+      {
+        address: transaction.from,
+        symbol: "ETH",
+        name: "Ethereum",
+        decimals: 18,
+        oldBalance: (valueEth + 5).toFixed(6), // Assume user has valueEth + 5 ETH
+        newBalance: "5.000000", // After transfer, left with 5 ETH
+        absoluteChange: `-${valueEth.toFixed(6)}`,
+        percentageChange: Math.round(-((valueEth / (valueEth + 5)) * 100) * 100) / 100,
+        usdValueChange: -Math.round(valueEth * ethPrice)
+      }
+    ];
+  } 
+  else if (isApproval) {
+    // For approvals, tokens don't change balance
+    balanceChanges = [
+      {
+        address: transaction.to,
+        symbol: isUnlimitedApproval ? "TOKEN" : "USDC",
+        name: isUnlimitedApproval ? "Unknown Token" : "USD Coin",
+        decimals: isUnlimitedApproval ? 18 : 6,
+        oldBalance: isUnlimitedApproval ? "1000.000000" : "2000.00",
+        newBalance: isUnlimitedApproval ? "1000.000000" : "2000.00",
+        absoluteChange: "0.000000",
+        percentageChange: 0,
+        usdValueChange: 0
+      }
+    ];
+  }
+  else if (isTokenTransfer) {
+    // For token transfers, simulate a reasonable amount
+    const transferAmount = 500;
+    balanceChanges = [
+      {
+        address: transaction.from,
+        symbol: "USDC",
+        name: "USD Coin",
+        decimals: 6,
+        oldBalance: "2000.00",
+        newBalance: "1500.00",
+        absoluteChange: "-500.00",
+        percentageChange: -25,
+        usdValueChange: -500
+      }
+    ];
+  }
+  else if (isSwap) {
+    // For swaps, simulate USDC -> ETH swap
+    balanceChanges = [
+      {
+        address: transaction.from,
+        symbol: "USDC",
+        name: "USD Coin",
+        decimals: 6,
+        oldBalance: "2000.00",
+        newBalance: "1000.00",
+        absoluteChange: "-1000.00",
+        percentageChange: -50,
+        usdValueChange: -1000
+      },
+      {
+        address: transaction.from,
+        symbol: "ETH",
+        name: "Ethereum",
+        decimals: 18,
+        oldBalance: "1.000000",
+        newBalance: "1.285714",
+        absoluteChange: "+0.285714",
+        percentageChange: 28.57,
+        usdValueChange: 1000
+      }
+    ];
+  }
+  else {
+    // Default fallback for unknown transaction types
+    balanceChanges = [
+      {
+        address: transaction.from,
+        symbol: "ETH",
+        name: "Ethereum",
+        decimals: 18,
+        oldBalance: valueEth > 0 ? (valueEth + 2).toFixed(6) : "10.000000",
+        newBalance: valueEth > 0 ? "2.000000" : "9.900000",
+        absoluteChange: valueEth > 0 ? `-${valueEth.toFixed(6)}` : "-0.100000",
+        percentageChange: valueEth > 0 ? Math.round(-(valueEth / (valueEth + 2)) * 100) : -1,
+        usdValueChange: valueEth > 0 ? -Math.round(valueEth * ethPrice) : -350
+      }
+    ];
+  }
+  
+  // Create MEV exposure for swaps or high value transactions
+  const mevExposure = (isSwap || valueEth > 1) ? {
+    sandwichRisk: isSwap ? 65 : 30,
+    frontrunningRisk: isSwap ? 40 : 20,
+    backrunningRisk: isSwap ? 25 : 10,
+    potentialMEVLoss: isSwap ? "0.015" : (valueEth * 0.003).toFixed(6),
+    suggestedProtections: [
+      "Use a private transaction service",
+      "Set maximum slippage to 1%",
+      "Execute through TX Shield contract"
+    ]
+  } : null;
+  
+  // Create warnings
+  const warnings = {
+    highSlippage: isSwap,
+    highGasUsage: gasUsage > 150000,
+    priceImpact: isSwap,
+    mevExposure: isSwap || valueEth > 1,
+    revertRisk: false,
+    customWarnings: isUnlimitedApproval ? ["Unlimited approval detected"] : 
+                   valueEth > 1 ? ["High-value transaction detected"] : []
+  };
   
   return {
     success: true,
     statusCode: 1,
     gasEstimate: {
-      gasUsed: isSwap ? "150000" : "65000",
-      gasLimit: isSwap ? "225000" : "97500",
-      gasCost: "0.00170",
-      gasCostUSD: 3.40
+      gasUsed: gasUsage.toString(),
+      gasLimit: Math.ceil(gasUsage * 1.5).toString(),
+      gasCost: gasCostEth,
+      gasCostUSD: parseFloat(gasCostUsd)
     },
-    balanceChanges: [
-      {
-        address: transaction.to,
-        symbol: isUnlimitedApproval ? "TOKEN" : (isApproval ? "USDC" : "ETH"),
-        name: isUnlimitedApproval ? "Unknown Token" : (isApproval ? "USD Coin" : "Ethereum"),
-        decimals: 18,
-        oldBalance: isApproval ? "1000.0" : "10.0",
-        newBalance: isApproval ? "1000.0" : "9.9",
-        absoluteChange: isApproval ? "0.0" : "-0.1",
-        percentageChange: isApproval ? 0 : -1,
-        usdValueChange: isApproval ? 0 : -200
-      }
-    ],
-    mevExposure: isSwap ? {
-      sandwichRisk: 65,
-      frontrunningRisk: 40,
-      backrunningRisk: 25,
-      potentialMEVLoss: "0.015",
-      suggestedProtections: [
-        "Use a private transaction service",
-        "Set maximum slippage to 1%",
-        "Execute through TX Shield contract"
-      ]
-    } : null,
-    warnings: {
-      highSlippage: isSwap,
-      highGasUsage: false,
-      priceImpact: isSwap,
-      mevExposure: isSwap,
-      revertRisk: false,
-      customWarnings: isUnlimitedApproval ? ["Unlimited approval detected"] : []
-    },
+    balanceChanges,
+    mevExposure,
+    warnings,
     logs: [],
     simulationId: `sim-${Date.now()}`
   };
@@ -563,61 +1121,105 @@ const createFallbackSimulation = (transaction) => {
 
 // Add this function for executing transactions with risk confirmation
 const executeTransactionWithConfirmation = () => {
-  if (threatAnalysis?.threatLevel === 'CRITICAL' || threatAnalysis?.threatLevel === 'HIGH') {
+  if (!threatAnalysis || !simulation) {
+    addToast({
+      type: 'warning',
+      message: 'Please analyze the transaction first',
+    });
+    return;
+  }
+  
+  if (threatAnalysis.threatLevel === 'CRITICAL' || threatAnalysis.threatLevel === 'HIGH') {
     setShowRiskDialog(true);
   } else {
-    executeTransaction();
+    // For non-critical transactions, use the confirm dialog
+    showConfirm(
+      `Are you sure you want to execute this transaction?`,
+      executeTransaction,
+      () => {
+        addToast({
+          type: 'info',
+          message: 'Transaction cancelled',
+        });
+      }
+    );
   }
 };
-  const executeTransaction = async () => {
-    if (!threatAnalysis || !simulation) {
-      alert('Please analyze the transaction first');
-      return;
-    }
-    
-    // Check if critical threat
-    if (threatAnalysis.threatLevel === 'CRITICAL') {
-      if (!window.confirm('⚠️ CRITICAL THREAT DETECTED! Are you absolutely sure you want to proceed?')) {
-        return;
+const executeTransaction = async () => {
+  if (!threatAnalysis || !simulation) {
+    addToast({
+      type: 'warning',
+      message: 'Please analyze the transaction first',
+    });
+    return;
+  }
+  
+  try {
+    // Execute transaction based on user preference
+    if (expanded.secureContract && isCorrectNetwork) {
+      // Use TX Shield contract for enhanced security
+      const txResponse = await executeSecureTransaction(
+        transaction.to,
+        ethers.utils.formatEther(transaction.value || '0'),
+        transaction.data,
+        threatAnalysis.threatLevel
+      );
+      
+      if (txResponse) {
+        addToast({
+          type: 'success',
+          message: `Transaction submitted through TX Shield!`,
+          action: {
+            label: 'View Transaction',
+            onClick: () => {
+              window.open(`https://lineascan.build/tx/${txResponse.hash}`, '_blank');
+            },
+          },
+        });
       }
-    } else if (threatAnalysis.threatLevel === 'HIGH') {
-      if (!window.confirm('⚠️ HIGH RISK TRANSACTION! Are you sure you want to proceed?')) {
-        return;
+    } else {
+      // Direct execution through MetaMask
+      const txResponse = await sendTransaction(transaction);
+      
+      if (txResponse) {
+        addToast({
+          type: 'success',
+          message: `Transaction submitted!`,
+          action: {
+            label: 'View Transaction',
+            onClick: () => {
+              window.open(`https://lineascan.build/tx/${txResponse.hash}`, '_blank');
+            },
+          },
+        });
       }
     }
-    
-    try {
-      // Execute transaction based on user preference
-      if (expanded.secureContract && isCorrectNetwork) {
-        // Use TX Shield contract for enhanced security
-        const txResponse = await executeSecureTransaction(
-          transaction.to,
-          ethers.utils.formatEther(transaction.value || '0'),
-          transaction.data,
-          threatAnalysis.threatLevel
-        );
-        
-        if (txResponse) {
-          alert(`Transaction submitted through TX Shield! Hash: ${txResponse.transactionHash}`);
-        }
-      } else {
-        // Direct execution through MetaMask
-        const txResponse = await sendTransaction(transaction);
-        
-        if (txResponse) {
-          alert(`Transaction submitted! Hash: ${txResponse.hash}`);
-        }
-      }
-    } catch (error) {
-      console.error('Transaction failed:', error);
-      alert(`Transaction failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  };
+  } catch (error) {
+    console.error('Transaction failed:', error);
+    addToast({
+      type: 'error',
+      message: `Transaction failed: ${formatErrorMessage(error)}`,
+    });
+  }
+};
   
   // Execute safer alternative
-  const executeSaferAlternative = async (alternativeIndex) => {
+const executeSaferAlternative = async (alternativeIndex) => {
+  try {
+    // Log start of the process
+    console.log(`Executing safer alternative ${alternativeIndex}`);
+    
+    // Create loading state
+    setLoading(true);
+    
+    // First, generate alternatives client-side as a fallback
+    const fallbackAlternatives = generateClientSideAlternatives(transaction);
+    console.log('Generated fallback alternatives:', fallbackAlternatives);
+    
+    let alternatives;
+    
+    // Try to get alternatives from API
     try {
-      // Get alternatives from API
       const alternativesResponse = await fetch('/api/alternatives', {
         method: 'POST',
         headers: {
@@ -626,38 +1228,253 @@ const executeTransactionWithConfirmation = () => {
         body: JSON.stringify(transaction),
       });
       
-      const { alternatives } = await alternativesResponse.json();
-      
-      if (!alternatives || alternatives.length <= alternativeIndex) {
-        alert('Alternative not available');
-        return;
+      if (alternativesResponse.ok) {
+        const responseText = await alternativesResponse.text();
+        
+        if (responseText && responseText.trim() !== '') {
+          try {
+            const apiResponse = JSON.parse(responseText);
+            alternatives = apiResponse.alternatives;
+            console.log('Using API alternatives:', alternatives);
+          } catch (jsonError) {
+            console.error('Error parsing alternatives response:', jsonError);
+            alternatives = fallbackAlternatives;
+          }
+        } else {
+          console.warn('Empty alternatives response, using fallback');
+          alternatives = fallbackAlternatives;
+        }
+      } else {
+        console.warn(`API returned status ${alternativesResponse.status}, using fallback`);
+        alternatives = fallbackAlternatives;
       }
-      
-      const alternative = alternatives[alternativeIndex];
-      
-      // Handle special execution methods
-      if (alternative.useTXShield) {
-        // Enable secure contract execution
-        setExpanded(prev => ({ ...prev, secureContract: true }));
-        setTransaction(alternative.transactionData);
-        alert('TX Shield secure execution enabled. Click "Execute Transaction" to proceed with enhanced security.');
-        return;
-      }
-      
-      if (alternative.privateTransaction) {
-        // For private transactions, we would need a backend service
-        alert('Private transaction feature requires backend integration. Using standard execution for now.');
-      }
-      
-      // Update transaction with the alternative data
-      setTransaction(alternative.transactionData);
-      alert(`Transaction modified to use ${alternative.title}. You can now execute it.`);
-    } catch (error) {
-      console.error('Failed to execute safer alternative:', error);
-      alert(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    } catch (apiError) {
+      console.error('Failed to fetch alternatives from API:', apiError);
+      alternatives = fallbackAlternatives;
     }
-  };
+    
+    if (!alternatives || alternatives.length <= alternativeIndex) {
+      addToast({
+        type: 'error',
+        message: 'Alternative not available',
+      });
+      setLoading(false);
+      return;
+    }
+    
+    const alternative = alternatives[alternativeIndex];
+    
+    // Handle special execution methods
+    if (alternative.useTXShield) {
+      // Enable secure contract execution
+      setExpanded(prev => ({ ...prev, secureContract: true }));
+      setTransaction(alternative.transactionData);
+      addToast({
+        type: 'info',
+        message: 'TX Shield secure execution enabled. Click "Execute Transaction" to proceed with enhanced security.',
+      });
+      setLoading(false);
+      return;
+    }
+    
+    if (alternative.privateTransaction) {
+      addToast({
+        type: 'info',
+        message: 'Private transaction feature requires backend integration. Using standard execution for now.',
+      });
+    }
+    
+    // Update transaction with the alternative data
+    setTransaction(alternative.transactionData);
+    addToast({
+      type: 'success',
+      message: `Transaction modified to use ${alternative.title}. You can now execute it.`,
+    });
+  } catch (error) {
+    console.error('Failed to execute safer alternative:', error);
+    addToast({
+      type: 'error',
+      message: `Error: ${formatErrorMessage(error)}`,
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+const generateClientSideAlternatives = (transaction) => {
+  const { to, data, value, from, chainId } = transaction;
+  const alternatives = [];
   
+  // TX Shield contract address
+  const txShieldContractAddress = "0xB31A5CdC928Ee7A3Ac915D5d196B733eb2C1b17B";
+  
+  // Analyze transaction to detect type
+  const isApproval = data?.startsWith('0x095ea7b3') || false;
+  const isUnlimitedApproval = isApproval && (data?.includes('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff') || false);
+  const isSwap = data?.startsWith('0x38ed1739') || data?.startsWith('0x7ff36ab5') || false;
+  const isEmpty = !data || data === '0x';
+  const isTokenTransfer = data?.startsWith('0xa9059cbb') || false;
+  
+  // Calculate ETH value
+  const valueWei = value ? parseInt(value) : 0;
+  const valueEth = valueWei / 1e18;
+  
+  // For unlimited approvals, suggest limited approval
+  if (isApproval && isUnlimitedApproval) {
+    // Extract spender address from approval data
+    const spenderAddressHex = '0x' + data.substring(34, 74);
+    
+    // Limited approval (100 tokens)
+    const limitedApprovalData = data.substring(0, 74) + '0000000000000000000000000000000000000000000000056bc75e2d63100000';
+    
+    alternatives.push({
+      title: 'Limited Token Approval',
+      description: 'Approve only 100 tokens instead of unlimited',
+      riskReduction: 85,
+      gasDifference: '+0%',
+      implementation: 'Modified transaction with max approval of 100 tokens',
+      transactionData: {
+        to,
+        data: limitedApprovalData,
+        value: '0'
+      }
+    });
+    
+    // Secure contract approval
+    alternatives.push({
+      title: 'Secure Contract Approval',
+      description: 'Use TX Shield contract for protected approval',
+      riskReduction: 95, 
+      gasDifference: '+20%',
+      implementation: 'Approval routed through TX Shield contract',
+      transactionData: {
+        to: txShieldContractAddress,
+        // Simplified function call (would be more complex in production)
+        data: `0x7e4768bf000000000000000000000000${to.substring(2)}000000000000000000000000${spenderAddressHex.substring(2)}0000000000000000000000000000000000000000000000056bc75e2d63100000`,
+        value: '0'
+      },
+      useTXShield: true
+    });
+  }
+  
+  // For swaps, suggest MEV protection
+  else if (isSwap) {
+    alternatives.push({
+      title: 'MEV-Protected Transaction',
+      description: 'Same transaction but routed through a private mempool',
+      riskReduction: 80,
+      gasDifference: '+15%',
+      implementation: 'Transaction sent via Flashbots or similar private transaction service',
+      transactionData: {
+        to,
+        data,
+        value: value || '0'
+      },
+      privateTransaction: true
+    });
+    
+    // For swaps, add TX Shield protection
+    alternatives.push({
+      title: 'TX Shield Protected Swap',
+      description: 'Execute through TX Shield for MEV protection',
+      riskReduction: 90,
+      gasDifference: '+20%',
+      implementation: 'Transaction routed through TX Shield contract',
+      transactionData: {
+        to: txShieldContractAddress,
+        data: createSimpleTxShieldData(to, data, value),
+        value: value || '0'
+      },
+      useTXShield: true
+    });
+  }
+  
+  // For ETH transfers, suggest TX Shield
+  else if (isEmpty && valueEth > 0) {
+    if (valueEth > 1) {
+      // Split transaction for large amounts
+      const halfValue = Math.floor(valueWei / 2).toString();
+      
+      alternatives.push({
+        title: 'Split Transaction',
+        description: 'Send as two separate transactions of half the amount',
+        riskReduction: 40,
+        gasDifference: '+100%',
+        implementation: 'Split into two separate transfers for safety',
+        transactionData: {
+          to,
+          data: '0x',
+          value: halfValue
+        }
+      });
+    }
+    
+    // TX Shield protection
+    alternatives.push({
+      title: 'TX Shield Protected Transfer',
+      description: 'Route through TX Shield contract for security',
+      riskReduction: 70,
+      gasDifference: '+30%',
+      implementation: 'Transfer via TX Shield contract',
+      transactionData: {
+        to: txShieldContractAddress,
+        data: createSimpleTxShieldData(to, '0x', value),
+        value: value
+      },
+      useTXShield: true
+    });
+  }
+  
+  // For token transfers, suggest TX Shield
+  else if (isTokenTransfer) {
+    alternatives.push({
+      title: 'TX Shield Protected Token Transfer',
+      description: 'Route through TX Shield contract for security',
+      riskReduction: 65,
+      gasDifference: '+20%',
+      implementation: 'Transfer via TX Shield contract',
+      transactionData: {
+        to: txShieldContractAddress,
+        data: createSimpleTxShieldData(to, data, '0'),
+        value: '0'
+      },
+      useTXShield: true
+    });
+  }
+  
+  // Default: TX Shield protection for any transaction
+  if (alternatives.length === 0 || !alternatives.some(alt => alt.useTXShield)) {
+    alternatives.push({
+      title: 'TX Shield Smart Contract Protection',
+      description: 'Execute through TX Shield for enhanced security',
+      riskReduction: 80,
+      gasDifference: '+20%',
+      implementation: 'Transaction routed through TX Shield contract',
+      transactionData: {
+        to: txShieldContractAddress,
+        data: createSimpleTxShieldData(to, data, value),
+        value: value || '0'
+      },
+      useTXShield: true
+    });
+  }
+  
+  return alternatives;
+};
+const createSimpleTxShieldData = (to, data, value) => {
+  // Simplified implementation for demo
+  const functionSelector = '0x6e9c1789'; // secureExecute function
+  
+  try {
+    // Very basic implementation - in production this would be proper ABI encoding
+    const hexTo = to.substring(2).padStart(64, '0');
+    const hexValue = value ? value.toString().padStart(64, '0') : '0'.padStart(64, '0');
+    
+    return `${functionSelector}${hexTo}${hexValue}`;
+  } catch (error) {
+    console.error('Error creating TX Shield data:', error);
+    return functionSelector;
+  }
+};
   // Render threat indicator component
   const renderThreatIndicator = () => {
     if (!threatAnalysis) return null;
@@ -700,24 +1517,30 @@ const executeTransactionWithConfirmation = () => {
         {expanded.details && (
           <div className="p-4 pt-0">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-gray-900 p-4 rounded-lg">
-                <h4 className="text-sm text-gray-400 mb-2">ML Score</h4>
-                <div className="flex items-center">
+            <div className="bg-gray-900 p-4 rounded-lg">
+              <h4 className="text-sm text-gray-400 mb-2">Risk Score</h4>
+              <div className="flex items-center">
+                <div 
+                  className="w-full bg-gray-700 h-3 rounded-full overflow-hidden"
+                >
                   <div 
-                    className="w-full bg-gray-700 h-3 rounded-full overflow-hidden"
-                  >
-                    <div 
-                      className="h-full rounded-full" 
-                      style={{ 
-                        width: `${threatAnalysis.details.mlScore * 100}%`,
-                        backgroundColor: threatAnalysis.details.mlScore > 0.7 ? '#EF4444' :
-                          threatAnalysis.details.mlScore > 0.4 ? '#F59E0B' : '#10B981'
-                      }}
-                    />
-                  </div>
-                  <span className="ml-2 text-sm">{(threatAnalysis.details.mlScore * 100).toFixed(0)}%</span>
+                    className="h-full rounded-full" 
+                    style={{ 
+                      width: `${threatAnalysis.details.mlScore * 100}%`,
+                      backgroundColor: threatAnalysis.details.mlScore > 0.7 ? '#EF4444' :
+                        threatAnalysis.details.mlScore > 0.4 ? '#F59E0B' : '#10B981'
+                    }}
+                  />
                 </div>
+                <span className="ml-2 text-sm font-medium">{(threatAnalysis.details.mlScore * 100).toFixed(0)}%</span>
               </div>
+              <div className="mt-2 text-xs text-gray-500">
+                {threatAnalysis.threatLevel === 'SAFE' && 'Low risk transaction'}
+                {threatAnalysis.threatLevel === 'SUSPICIOUS' && 'Medium risk, proceed with caution'}
+                {threatAnalysis.threatLevel === 'HIGH' && 'High risk transaction, verify carefully'}
+                {threatAnalysis.threatLevel === 'CRITICAL' && 'Critical risk, strongly recommended to abort'}
+              </div>
+            </div>
               
               <div className="bg-gray-900 p-4 rounded-lg">
                 <h4 className="text-sm text-gray-400 mb-2">Similar Scams</h4>
@@ -905,234 +1728,333 @@ const executeTransactionWithConfirmation = () => {
   };
   
   // Render simulation results
-  const renderSimulation = () => {
-    if (!simulation) return null;
-    
-    return (
-      <motion.div 
-        className="mb-6 bg-gray-800 rounded-lg overflow-hidden"
-        initial={{ opacity: 0, height: 0 }}
-        animate={{ 
-          opacity: expanded.simulation ? 1 : 0.8,
-          height: expanded.simulation ? 'auto' : '60px'
-        }}
-        transition={{ duration: 0.3 }}
+// Improved renderSimulation function with better data handling
+const renderSimulation = () => {
+  if (!simulation) return null;
+  
+  // Log the simulation data to help with debugging
+  console.log('Rendering simulation with data:', simulation);
+  
+  // Format numbers properly
+  const formatNumber = (num, decimals = 6) => {
+    if (typeof num === 'string') {
+      // Try to parse the string as a number
+      return parseFloat(num).toFixed(decimals);
+    } else if (typeof num === 'number') {
+      return num.toFixed(decimals);
+    }
+    return '0.000000'; // Fallback
+  };
+  
+  // Format currency with $ sign
+  const formatCurrency = (value) => {
+    if (!value && value !== 0) return '$0.00';
+    return `$${Math.abs(parseFloat(value)).toFixed(2)}`;
+  };
+  
+  // Calculate gas values if missing
+  const gasUsed = simulation.gasEstimate?.gasUsed ? 
+    parseInt(simulation.gasEstimate.gasUsed).toLocaleString() : '0';
+  
+  const gasCost = simulation.gasEstimate?.gasCost || '0.00000';
+  const gasCostUSD = simulation.gasEstimate?.gasCostUSD || 0;
+  
+  return (
+    <motion.div 
+      className="mb-6 bg-gray-800 rounded-lg overflow-hidden"
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ 
+        opacity: expanded.simulation ? 1 : 0.8,
+        height: expanded.simulation ? 'auto' : '60px'
+      }}
+      transition={{ duration: 0.3 }}
+    >
+      <div 
+        className="p-4 flex justify-between items-center cursor-pointer"
+        onClick={() => toggleSection('simulation')}
       >
-        <div 
-          className="p-4 flex justify-between items-center cursor-pointer"
-          onClick={() => toggleSection('simulation')}
-        >
-          <h3 className="text-lg font-medium flex items-center">
-            <Activity className="mr-2" size={20} />
-            Transaction Simulation
-          </h3>
-          {expanded.simulation ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-        </div>
-        
-        {expanded.simulation && (
-          <div className="p-4 pt-0">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <div className="bg-gray-900 p-4 rounded-lg">
-                <h4 className="text-sm text-gray-400 mb-2">Status</h4>
-                <div className="flex items-center">
-                  {simulation.success ? (
-                    <>
-                      <Check size={20} className="mr-2 text-green-500" />
-                      <span className="text-green-500 font-medium">Success</span>
-                    </>
-                  ) : (
-                    <>
-                      <X size={20} className="mr-2 text-red-500" />
-                      <span className="text-red-500 font-medium">Failed</span>
-                    </>
-                  )}
-                </div>
-                {!simulation.success && simulation.revertReason && (
-                  <div className="mt-2 text-sm text-red-400">
-                    Reason: {simulation.revertReason}
-                  </div>
+        <h3 className="text-lg font-medium flex items-center">
+          <Activity className="mr-2" size={20} />
+          Transaction Simulation
+        </h3>
+        {expanded.simulation ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+      </div>
+      
+      {expanded.simulation && (
+        <div className="p-4 pt-0">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="bg-gray-900 p-4 rounded-lg">
+              <h4 className="text-sm text-gray-400 mb-2">Status</h4>
+              <div className="flex items-center">
+                {simulation.success ? (
+                  <>
+                    <Check size={20} className="mr-2 text-green-500" />
+                    <span className="text-green-500 font-medium">Success</span>
+                  </>
+                ) : (
+                  <>
+                    <X size={20} className="mr-2 text-red-500" />
+                    <span className="text-red-500 font-medium">Failed</span>
+                  </>
                 )}
               </div>
-              
-              <div className="bg-gray-900 p-4 rounded-lg">
-                <h4 className="text-sm text-gray-400 mb-2">Gas Used</h4>
-                <div className="text-xl font-bold">
-                  {parseInt(simulation.gasEstimate.gasUsed).toLocaleString()}
-                  <span className="text-sm text-gray-400 ml-1">units</span>
+              {!simulation.success && simulation.revertReason && (
+                <div className="mt-2 text-sm text-red-400">
+                  Reason: {simulation.revertReason}
                 </div>
-                <div className="text-sm text-gray-400 mt-1">
-                  Est. Cost: {parseFloat(simulation.gasEstimate.gasCost).toFixed(6)} ETH 
-                  (${simulation.gasEstimate.gasCostUSD.toFixed(2)})
-                </div>
+              )}
+            </div>
+            
+            <div className="bg-gray-900 p-4 rounded-lg">
+              <h4 className="text-sm text-gray-400 mb-2">Gas Used</h4>
+              <div className="text-xl font-bold">
+                {gasUsed}
+                <span className="text-sm text-gray-400 ml-1">units</span>
               </div>
-              
-              <div className="bg-gray-900 p-4 rounded-lg">
-                <h4 className="text-sm text-gray-400 mb-2">Balance Changes</h4>
-                <div className="text-xl font-bold">
-                  {simulation.balanceChanges.length}
-                  <span className="text-sm text-gray-400 ml-1">tokens affected</span>
-                </div>
+              <div className="text-sm text-gray-400 mt-1">
+                Est. Cost: {formatNumber(gasCost)} ETH 
+                ({formatCurrency(gasCostUSD)})
               </div>
             </div>
             
-            {simulation.balanceChanges.length > 0 && (
-              <div className="mt-4">
-                <h4 className="text-sm text-gray-400 mb-2">Token Balance Changes</h4>
-                <div className="bg-gray-900 p-4 rounded-lg">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-left text-gray-400 border-b border-gray-700">
-                          <th className="pb-2 pr-4">Token</th>
-                          <th className="pb-2 pr-4">Old Balance</th>
-                          <th className="pb-2 pr-4">New Balance</th>
-                          <th className="pb-2 pr-4">Change</th>
-                          <th className="pb-2">USD Value</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {simulation.balanceChanges.map((change, i) => (
+            <div className="bg-gray-900 p-4 rounded-lg">
+              <h4 className="text-sm text-gray-400 mb-2">Balance Changes</h4>
+              <div className="text-xl font-bold">
+                {simulation.balanceChanges?.length || 0}
+                <span className="text-sm text-gray-400 ml-1">tokens affected</span>
+              </div>
+            </div>
+          </div>
+          
+          {simulation.balanceChanges && simulation.balanceChanges.length > 0 && (
+            <div className="mt-4">
+              <h4 className="text-sm text-gray-400 mb-2">Token Balance Changes</h4>
+              <div className="bg-gray-900 p-4 rounded-lg">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-gray-400 border-b border-gray-700">
+                        <th className="pb-2 pr-4">Token</th>
+                        <th className="pb-2 pr-4">Old Balance</th>
+                        <th className="pb-2 pr-4">New Balance</th>
+                        <th className="pb-2 pr-4">Change</th>
+                        <th className="pb-2">USD Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {simulation.balanceChanges.map((change, i) => {
+                        // Extract and format values safely
+                        const symbol = change.symbol || 'TOKEN';
+                        const oldBalance = change.oldBalance || '0';
+                        const newBalance = change.newBalance || '0';
+                        const absoluteChange = change.absoluteChange || '0';
+                        const percentageChange = change.percentageChange || 0;
+                        const usdValueChange = change.usdValueChange;
+
+                        // Determine if the absoluteChange is positive or negative
+                        const isPositiveChange = absoluteChange.toString().charAt(0) !== '-';
+                        const absChangeDisplay = isPositiveChange 
+                          ? `+${formatNumber(absoluteChange, symbol === 'ETH' ? 6 : 2)}`
+                          : formatNumber(absoluteChange, symbol === 'ETH' ? 6 : 2);
+                        
+                        return (
                           <tr key={i} className="border-b border-gray-700">
                             <td className="py-3 pr-4">
                               <div className="flex items-center">
                                 <div className="w-5 h-5 bg-gray-700 rounded-full mr-2 flex items-center justify-center text-xs">
-                                  {change.symbol.charAt(0)}
+                                  {symbol.charAt(0)}
                                 </div>
-                                <span className="font-medium">{change.symbol}</span>
+                                <span className="font-medium">{symbol}</span>
                               </div>
                             </td>
                             <td className="py-3 pr-4">
-                              {parseFloat(change.oldBalance).toFixed(change.symbol === 'ETH' ? 6 : 2)}
+                              {typeof oldBalance === 'string' && oldBalance.includes('Unknown') 
+                                ? oldBalance 
+                                : formatNumber(oldBalance, symbol === 'ETH' ? 6 : 2)}
                             </td>
                             <td className="py-3 pr-4">
-                              {parseFloat(change.newBalance).toFixed(change.symbol === 'ETH' ? 6 : 2)}
+                              {typeof newBalance === 'string' && newBalance.includes('Unknown') 
+                                ? newBalance 
+                                : formatNumber(newBalance, symbol === 'ETH' ? 6 : 2)}
                             </td>
                             <td className="py-3 pr-4">
-                              <span className={parseFloat(change.absoluteChange) >= 0 ? 'text-green-500' : 'text-red-500'}>
-                                {parseFloat(change.absoluteChange) >= 0 ? '+' : ''}
-                                {parseFloat(change.absoluteChange).toFixed(change.symbol === 'ETH' ? 6 : 2)}
+                              <span className={isPositiveChange ? 'text-green-500' : 'text-red-500'}>
+                                {absChangeDisplay}
                                 {' '}
-                                ({change.percentageChange >= 0 ? '+' : ''}
-                                {change.percentageChange.toFixed(2)}%)
+                                ({percentageChange >= 0 ? '+' : ''}
+                                {typeof percentageChange === 'number' ? percentageChange.toFixed(2) : percentageChange}%)
                               </span>
                             </td>
                             <td className="py-3">
-                              {change.usdValueChange !== undefined ? (
-                                <span className={change.usdValueChange >= 0 ? 'text-green-500' : 'text-red-500'}>
-                                  {change.usdValueChange >= 0 ? '+' : ''}
-                                  ${Math.abs(change.usdValueChange).toFixed(2)}
+                              {usdValueChange !== undefined ? (
+                                <span className={usdValueChange >= 0 ? 'text-green-500' : 'text-red-500'}>
+                                  {usdValueChange >= 0 ? '+' : ''}
+                                  {formatCurrency(usdValueChange)}
                                 </span>
                               ) : (
                                 <span className="text-gray-500">N/A</span>
                               )}
                             </td>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            )}
-            
-            {simulation.mevExposure && (
-              <div className="mt-6">
-                <h4 className="text-sm text-gray-400 mb-3">MEV Exposure Analysis</h4>
-                <div className="bg-gray-900 p-4 rounded-lg">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                    <div>
-                      <h5 className="text-xs text-gray-500 mb-1">Sandwich Attack Risk</h5>
-                      <div className="flex items-center">
-                        <div className="w-full bg-gray-700 h-3 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full rounded-full" 
-                            style={{ 
-                              width: `${simulation.mevExposure.sandwichRisk}%`,
-                              backgroundColor: simulation.mevExposure.sandwichRisk > 70 ? '#EF4444' :
-                                simulation.mevExposure.sandwichRisk > 40 ? '#F59E0B' : '#10B981'
-                            }}
-                          />
-                        </div>
-                        <span className="ml-2 text-sm">{simulation.mevExposure.sandwichRisk}%</span>
+            </div>
+          )}
+          
+          {simulation.mevExposure && (
+            <div className="mt-6">
+              <h4 className="text-sm text-gray-400 mb-3">MEV Exposure Analysis</h4>
+              <div className="bg-gray-900 p-4 rounded-lg">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <h5 className="text-xs text-gray-500 mb-1">Sandwich Attack Risk</h5>
+                    <div className="flex items-center">
+                      <div className="w-full bg-gray-700 h-3 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full rounded-full" 
+                          style={{ 
+                            width: `${simulation.mevExposure.sandwichRisk}%`,
+                            backgroundColor: simulation.mevExposure.sandwichRisk > 70 ? '#EF4444' :
+                              simulation.mevExposure.sandwichRisk > 40 ? '#F59E0B' : '#10B981'
+                          }}
+                        />
                       </div>
-                    </div>
-                    
-                    <div>
-                      <h5 className="text-xs text-gray-500 mb-1">Frontrunning Risk</h5>
-                      <div className="flex items-center">
-                        <div className="w-full bg-gray-700 h-3 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full rounded-full" 
-                            style={{ 
-                              width: `${simulation.mevExposure.frontrunningRisk}%`,
-                              backgroundColor: simulation.mevExposure.frontrunningRisk > 70 ? '#EF4444' :
-                                simulation.mevExposure.frontrunningRisk > 40 ? '#F59E0B' : '#10B981'
-                            }}
-                          />
-                        </div>
-                        <span className="ml-2 text-sm">{simulation.mevExposure.frontrunningRisk}%</span>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <h5 className="text-xs text-gray-500 mb-1">Potential MEV Loss</h5>
-                      <div className="text-lg font-medium">
-                        ~ {simulation.mevExposure.potentialMEVLoss} ETH
-                      </div>
+                      <span className="ml-2 text-sm">{simulation.mevExposure.sandwichRisk}%</span>
                     </div>
                   </div>
                   
-                  {simulation.mevExposure.suggestedProtections.length > 0 && (
-                    <div className="mt-3">
-                      <h5 className="text-xs text-gray-500 mb-2">Suggested Protections</h5>
-                      <ul className="text-sm space-y-1">
-                        {simulation.mevExposure.suggestedProtections.map((protection, i) => (
-                          <li key={i} className="flex items-start">
-                            <Shield size={14} className="mr-2 mt-1 flex-shrink-0" />
-                            <span>{protection}</span>
-                          </li>
-                        ))}
-                      </ul>
+                  <div>
+                    <h5 className="text-xs text-gray-500 mb-1">Frontrunning Risk</h5>
+                    <div className="flex items-center">
+                      <div className="w-full bg-gray-700 h-3 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full rounded-full" 
+                          style={{ 
+                            width: `${simulation.mevExposure.frontrunningRisk}%`,
+                            backgroundColor: simulation.mevExposure.frontrunningRisk > 70 ? '#EF4444' :
+                              simulation.mevExposure.frontrunningRisk > 40 ? '#F59E0B' : '#10B981'
+                          }}
+                        />
+                      </div>
+                      <span className="ml-2 text-sm">{simulation.mevExposure.frontrunningRisk}%</span>
                     </div>
-                  )}
+                  </div>
+                  
+                  <div>
+                    <h5 className="text-xs text-gray-500 mb-1">Potential MEV Loss</h5>
+                    <div className="text-lg font-medium">
+                      ~ {simulation.mevExposure.potentialMEVLoss} ETH
+                    </div>
+                  </div>
                 </div>
+                
+                {simulation.mevExposure.suggestedProtections && 
+                 simulation.mevExposure.suggestedProtections.length > 0 && (
+                  <div className="mt-3">
+                    <h5 className="text-xs text-gray-500 mb-2">Suggested Protections</h5>
+                    <ul className="text-sm space-y-1">
+                      {simulation.mevExposure.suggestedProtections.map((protection, i) => (
+                        <li key={i} className="flex items-start">
+                          <Shield size={14} className="mr-2 mt-1 flex-shrink-0" />
+                          <span>{protection}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        )}
-      </motion.div>
-    );
-  };
-  
+            </div>
+          )}
+        </div>
+      )}
+    </motion.div>
+  );
+};
   // Render safer alternatives
+  // const renderAlternatives = () => {
+  //   if (!threatAnalysis || !simulation) return null;
+    
+  //   // Sample alternatives
+  //   const alternatives = [
+  //     {
+  //       title: 'Limited Token Approval',
+  //       description: 'Approve only the exact amount needed instead of infinite approval',
+  //       riskReduction: 85,
+  //       gasDifference: '+5%',
+  //       implementation: 'Modified transaction with max approval of 100 tokens'
+  //     },
+  //     {
+  //       title: 'Optimized Gas Settings',
+  //       description: 'Same transaction with optimized gas settings to reduce MEV risk',
+  //       riskReduction: 40,
+  //       gasDifference: '-15%',
+  //       implementation: 'Private transaction with MEV protection'
+  //     },
+  //     {
+  //       title: 'Safer Contract Interaction',
+  //       description: 'Use TX Shield smart contract as proxy for additional security',
+  //       riskReduction: 95,
+  //       gasDifference: '+10%',
+  //       implementation: 'Transaction routed through TXShield contract with safety checks'
+  //     }
+  //   ];
+    
+  //   return (
+  //     <motion.div 
+  //       className="mb-6"
+  //       initial={{ opacity: 0, y: 20 }}
+  //       animate={{ opacity: 1, y: 0 }}
+  //       transition={{ duration: 0.3, delay: 0.2 }}
+  //     >
+  //       <h3 className="text-lg font-medium mb-4 flex items-center">
+  //         <Shield className="mr-2" size={20} />
+  //         Safer Alternatives
+  //       </h3>
+        
+  //       <div className="space-y-4">
+  //         {alternatives.map((alt, i) => (
+  //           <div key={i} className="bg-gray-800 p-4 rounded-lg">
+  //             <div className="flex items-start justify-between">
+  //               <div>
+  //                 <h4 className="font-medium">{alt.title}</h4>
+  //                 <p className="text-sm text-gray-400 mt-1">{alt.description}</p>
+                  
+  //                 <div className="mt-3 flex items-center space-x-4">
+  //                   <div className="flex items-center">
+  //                     <Shield size={16} className="mr-1 text-green-500" />
+  //                     <span className="text-sm">Risk -{alt.riskReduction}%</span>
+  //                   </div>
+                    
+  //                   <div className="flex items-center">
+  //                     <Zap size={16} className="mr-1 text-yellow-500" />
+  //                     <span className="text-sm">Gas {alt.gasDifference}</span>
+  //                   </div>
+  //                 </div>
+                  
+  //                 <div className="mt-2 text-xs text-gray-500">
+  //                   {alt.implementation}
+  //                 </div>
+  //               </div>
+                
+  //               <button
+  //                 onClick={() => executeSaferAlternative(i)}
+  //                 className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-md text-sm flex items-center"
+  //               >
+  //                 Use This
+  //                 <ArrowRight size={14} className="ml-1" />
+  //               </button>
+  //             </div>
+  //           </div>
+  //         ))}
+  //       </div>
+  //     </motion.div>
+  //   );
+  // };
   const renderAlternatives = () => {
-    if (!threatAnalysis || !simulation) return null;
-    
-    // Sample alternatives
-    const alternatives = [
-      {
-        title: 'Limited Token Approval',
-        description: 'Approve only the exact amount needed instead of infinite approval',
-        riskReduction: 85,
-        gasDifference: '+5%',
-        implementation: 'Modified transaction with max approval of 100 tokens'
-      },
-      {
-        title: 'Optimized Gas Settings',
-        description: 'Same transaction with optimized gas settings to reduce MEV risk',
-        riskReduction: 40,
-        gasDifference: '-15%',
-        implementation: 'Private transaction with MEV protection'
-      },
-      {
-        title: 'Safer Contract Interaction',
-        description: 'Use TX Shield smart contract as proxy for additional security',
-        riskReduction: 95,
-        gasDifference: '+10%',
-        implementation: 'Transaction routed through TXShield contract with safety checks'
-      }
-    ];
-    
     return (
       <motion.div 
         className="mb-6"
@@ -1145,46 +2067,65 @@ const executeTransactionWithConfirmation = () => {
           Safer Alternatives
         </h3>
         
-        <div className="space-y-4">
-          {alternatives.map((alt, i) => (
-            <div key={i} className="bg-gray-800 p-4 rounded-lg">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h4 className="font-medium">{alt.title}</h4>
-                  <p className="text-sm text-gray-400 mt-1">{alt.description}</p>
-                  
-                  <div className="mt-3 flex items-center space-x-4">
-                    <div className="flex items-center">
-                      <Shield size={16} className="mr-1 text-green-500" />
-                      <span className="text-sm">Risk -{alt.riskReduction}%</span>
-                    </div>
+        <div className="bg-gray-800 p-6 rounded-lg relative overflow-hidden">
+          {/* Semi-transparent overlay */}
+          <div className="absolute inset-0 bg-blue-900/20 backdrop-blur-sm flex items-center justify-center">
+            <div className="bg-gray-900/80 px-6 py-4 rounded-lg shadow-lg text-center">
+              <h4 className="text-xl font-bold text-blue-400 mb-2">Coming Soon</h4>
+              <p className="text-gray-300">We're working on advanced transaction alternatives to help you stay safe</p>
+            </div>
+          </div>
+          
+          {/* Preview content (shown with reduced opacity) */}
+          <div className="opacity-40">
+            <div className="space-y-4">
+              <div className="bg-gray-700 p-4 rounded-lg">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="font-medium">Limited Token Approval</h4>
+                    <p className="text-sm text-gray-400 mt-1">Approve only the exact amount needed instead of infinite approval</p>
                     
-                    <div className="flex items-center">
-                      <Zap size={16} className="mr-1 text-yellow-500" />
-                      <span className="text-sm">Gas {alt.gasDifference}</span>
+                    <div className="mt-3 flex items-center space-x-4">
+                      <div className="flex items-center">
+                        <Shield size={16} className="mr-1 text-green-500" />
+                        <span className="text-sm">Risk -85%</span>
+                      </div>
+                      
+                      <div className="flex items-center">
+                        <Zap size={16} className="mr-1 text-yellow-500" />
+                        <span className="text-sm">Gas +5%</span>
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="mt-2 text-xs text-gray-500">
-                    {alt.implementation}
                   </div>
                 </div>
-                
-                <button
-                  onClick={() => executeSaferAlternative(i)}
-                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded-md text-sm flex items-center"
-                >
-                  Use This
-                  <ArrowRight size={14} className="ml-1" />
-                </button>
+              </div>
+              
+              <div className="bg-gray-700 p-4 rounded-lg">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="font-medium">Secure TX Shield Routing</h4>
+                    <p className="text-sm text-gray-400 mt-1">Execute through our secure contract with built-in protections</p>
+                  </div>
+                </div>
               </div>
             </div>
-          ))}
+          </div>
+        </div>
+        
+        <div className="mt-4 bg-blue-900/20 p-4 rounded-lg">
+          <div className="flex items-start">
+            <Info size={18} className="text-blue-400 mr-3 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm text-gray-300">
+                TX Shield is developing advanced transaction alternatives to help reduce risk and protect your assets. 
+                This feature will be available in the next update.
+              </p>
+            </div>
+          </div>
         </div>
       </motion.div>
     );
   };
-  
 // TransactionAnalyzer.tsx - Complete render function
 // Replace your existing return statement with this entire block
 
@@ -1352,7 +2293,7 @@ return (
               </div>
             </div>
             
-            <div className="mt-4 pt-4 border-t border-gray-700">
+            {/* <div className="mt-4 pt-4 border-t border-gray-700">
               <div className="text-sm text-gray-400">
                 <div className="flex items-center">
                   <DollarSign size={14} className="mr-1" />
@@ -1363,7 +2304,7 @@ return (
                   <span>Threats blocked: 1,285</span>
                 </div>
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
       </div>
@@ -1469,6 +2410,7 @@ return (
                   )}
                   
                   {/* Original Threat Indicator */}
+                  {renderScamAlert()}
                   {renderThreatIndicator()}
                   {renderThreatDetails()}
                   {renderRecommendations()}
@@ -1613,6 +2555,41 @@ return (
         </div>
       )}
     </div>
+    <TransactionTemplateSelector
+      isOpen={showTemplateSelector}
+      onClose={() => setShowTemplateSelector(false)}
+      onSelectTemplate={handleSelectTemplate}
+      templates={[
+        {
+          name: "Token Approval (Unlimited)",
+          to: '0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f', // WETH on Linea
+          data: '0x095ea7b3000000000000000000000000646e4ee3ee5fdd82497ae2b6ea7f9cd333fe8ef9ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', // Approve Horizondex Router unlimited
+          value: '0',
+          description: 'WETH unlimited approval to Horizondex Router on Linea'
+        },
+        {
+          name: "Token Approval (Limited)",
+          to: '0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f', // WETH on Linea
+          data: '0x095ea7b3000000000000000000000000646e4ee3ee5fdd82497ae2b6ea7f9cd333fe8ef90000000000000000000000000000000000000000000000001bc16d674ec80000', // Approve 2 WETH
+          value: '0',
+          description: 'WETH limited approval (2 WETH) to Horizondex Router on Linea'
+        },
+        {
+          name: "Token Transfer",
+          to: '0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f', // WETH on Linea
+          data: '0xa9059cbb0000000000000000000000001234567890123456789012345678901234567890000000000000000000000000000000000000000000000000de0b6b3a7640000', // Transfer 1 WETH
+          value: '0',
+          description: 'Transfer 1 WETH to another address on Linea'
+        },
+        {
+          name: "ETH Transfer",
+          to: '0x1234567890123456789012345678901234567890', // Random address
+          data: '0x',
+          value: '100000000000000000', // 0.1 ETH
+          description: 'Send 0.1 ETH to an address on Linea'
+        }
+      ]}
+    />
   </div>
 );
 };

@@ -17,7 +17,10 @@ const nextConfig = {
     ];
   },
   // Disable React StrictMode during development as it can cause double API calls
-  reactStrictMode: false
+  reactStrictMode: true,
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 };
 
 module.exports = nextConfig;

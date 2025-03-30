@@ -258,13 +258,27 @@ export default function useBlockchainData() {
     
     // Add your token addresses here
     if (chainId) {
-      const commonTokens = [
-        '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14', // WETH on Sepolia
-        '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238', // USDC on Sepolia
-        '0x68194a729C2450ad26072b3D33ADaCbcef39D574', // DAI on Sepolia
-      ];
+      const commonTokens = [];
       
-      fetchTokenBalances(commonTokens);
+      // Use Linea tokens if on Linea network
+      if (chainId === 59144) {
+        commonTokens.push(
+          '0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f', // WETH on Linea
+          '0x176211869cA2b568f2A7D4EE941E073a821EE1ff', // USDC on Linea
+          '0x4AF15ec2A0BD43Db75dd04E62FAA3B8EF36b00d5'  // DAI on Linea
+        );
+      } else if (chainId === 11155111) {
+        // Fallback to Sepolia tokens
+        commonTokens.push(
+          '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14', // WETH on Sepolia
+          '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238', // USDC on Sepolia
+          '0x68194a729C2450ad26072b3D33ADaCbcef39D574'  // DAI on Sepolia
+        );
+      }
+      
+      if (commonTokens.length > 0) {
+        fetchTokenBalances(commonTokens);
+      }
       fetchTransactionHistory();
     }
   }, [

@@ -29,6 +29,7 @@
     "react-dom": "^18.2.0",
     "recharts": "^2.15.1",
     "redis": "^4.7.0",
+    "viem": "^2.24.2",
     "zksync-web3": "^0.17.1"
   },
   "devDependencies": {

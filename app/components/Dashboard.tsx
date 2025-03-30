@@ -19,7 +19,15 @@ interface DashboardProps {
 const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
   const [activeTab, setActiveTab] = useState<'home' | 'analyze' | 'portfolio' | 'history' | 'settings'>(defaultTab);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const { account, chainId, networkName, connect, disconnect, switchToSepolia } = useMetaMask();
+  const { 
+    account, 
+    chainId, 
+    networkName, 
+    isCorrectNetwork, 
+    connect, 
+    disconnect, 
+    switchToLinea 
+  } = useMetaMask();
   const { 
     ethBalance, 
     tokens, 
@@ -116,11 +124,16 @@ const Dashboard: React.FC<DashboardProps> = ({ defaultTab = 'home' }) => {
   };
   
   // Effect to refresh data when account or chain changes
-  useEffect(() => {
-    if (account && chainId) {
-      refreshAllData();
-    }
-  }, [account, chainId, refreshAllData]);
+useEffect(() => {
+  if (account && chainId) {
+    refreshAllData();
+  }
+  
+  // Make sure we're on Linea
+  if (account && !isCorrectNetwork) {
+    switchToLinea();
+  }
+}, [account, chainId, isCorrectNetwork, refreshAllData, switchToLinea]);
   
   // Render dashboard home content
   const renderHomeContent = () => {

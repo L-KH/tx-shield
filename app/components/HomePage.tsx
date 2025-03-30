@@ -71,7 +71,7 @@ export default function HomePage() {
           </section>
           
           {/* Key Stats */}
-          <motion.section
+          {/* <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.4 }}
@@ -91,7 +91,7 @@ export default function HomePage() {
               <div className="text-4xl font-bold text-purple-500 mb-2">128.5 ETH</div>
               <div className="text-gray-400">MEV Saved</div>
             </div>
-          </motion.section>
+          </motion.section> */}
           
           {/* Features */}
           <section id="features" className="mb-20">
@@ -196,8 +196,8 @@ export default function HomePage() {
                 </div>
                 <h3 className="text-xl font-bold mb-3">Multi-Chain Support</h3>
                 <p className="text-gray-400">
-                  Protect your transactions across Ethereum, Polygon, Arbitrum, Optimism, 
-                  and other major EVM chains.
+                  Protect your transactions across Ethereum, Linea, Sepolia, 
+                  and other major EVM chains. [Soon]
                 </p>
               </motion.div>
             </div>

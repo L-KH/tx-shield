@@ -8,25 +8,26 @@ export const CHAIN_ID = {
   SEPOLIA: 11155111,
   POLYGON: 137,
   ARBITRUM: 42161,
+  LINEA: 59144, // Add Linea Mainnet chain ID
 };
 
-export const DEFAULT_CHAIN_ID = 
-  process.env.NEXT_PUBLIC_DEFAULT_CHAIN_ID ? 
-  parseInt(process.env.NEXT_PUBLIC_DEFAULT_CHAIN_ID) : 
-  CHAIN_ID.SEPOLIA;
+// Set Linea as the default chain ID for the hackathon
+export const DEFAULT_CHAIN_ID = CHAIN_ID.LINEA; 
 
 export const NETWORK_NAMES = {
   [CHAIN_ID.MAINNET]: 'Ethereum Mainnet',
   [CHAIN_ID.SEPOLIA]: 'Sepolia Testnet',
   [CHAIN_ID.POLYGON]: 'Polygon',
   [CHAIN_ID.ARBITRUM]: 'Arbitrum',
+  [CHAIN_ID.LINEA]: 'Linea Mainnet', // Add Linea name
 };
 
 export const RPC_URLS = {
   [CHAIN_ID.MAINNET]: 'https://mainnet.infura.io/v3/your_infura_key',
-  [CHAIN_ID.SEPOLIA]: process.env.NEXT_PUBLIC_RPC_URL || 'https://sepolia.infura.io/v3/your_infura_key',
+  [CHAIN_ID.SEPOLIA]: process.env.NEXT_PUBLIC_RPC_URL || 'https://sepolia.infura.io/v3/05d4ee46c0344087bdf6444ac21cc894',
   [CHAIN_ID.POLYGON]: 'https://polygon-mainnet.infura.io/v3/your_infura_key',
-  [CHAIN_ID.ARBITRUM]: 'https://arbitrum-mainnet.infura.io/v3/your_infura_key',
+  [CHAIN_ID.ARBITRUM]: 'https://arbitrum-mainnet.infura.io/v3/05d4ee46c0344087bdf6444ac21cc894',
+  [CHAIN_ID.LINEA]: 'https://linea-mainnet.infura.io/v3/05d4ee46c0344087bdf6444ac21cc894', // Added Linea RPC URL
 };
 
 export const BLOCK_EXPLORERS = {
@@ -34,8 +35,8 @@ export const BLOCK_EXPLORERS = {
   [CHAIN_ID.SEPOLIA]: 'https://sepolia.etherscan.io',
   [CHAIN_ID.POLYGON]: 'https://polygonscan.com',
   [CHAIN_ID.ARBITRUM]: 'https://arbiscan.io',
+  [CHAIN_ID.LINEA]: 'https://lineascan.build', // Add Linea block explorer
 };
-
 // Get provider for current network
 export function getProvider() {
   // For client-side, use window.ethereum if available

@@ -12,16 +12,18 @@ export const CONTRACT_ADDRESSES = {
     [CHAIN_ID.SEPOLIA]: '0xc076D95F95021D1fBBfe2BDB9692d656B7ddc846',
     [CHAIN_ID.POLYGON]: '0x0000000000000000000000000000000000000000', // Update when deployed to Polygon
     [CHAIN_ID.ARBITRUM]: '0x0000000000000000000000000000000000000000', // Update when deployed to Arbitrum
+    [CHAIN_ID.LINEA]: '0xB31A5CdC928Ee7A3Ac915D5d196B733eb2C1b17B', // Linea Mainnet - REPLACE WITH YOUR ACTUAL DEPLOYED ADDRESS
   },
   ThreatRegistry: {
     [CHAIN_ID.MAINNET]: '0x0000000000000000000000000000000000000000', // Update when deployed to mainnet
     [CHAIN_ID.SEPOLIA]: '0xE6597458679e0d8ca9AD31B7dA118E77560028e6',
     [CHAIN_ID.POLYGON]: '0x0000000000000000000000000000000000000000', // Update when deployed to Polygon
     [CHAIN_ID.ARBITRUM]: '0x0000000000000000000000000000000000000000', // Update when deployed to Arbitrum
+    [CHAIN_ID.LINEA]: '0x963Cd3E7231fEc38cb658D23279dF9d25203b8f8', // Linea Mainnet - REPLACE WITH YOUR ACTUAL DEPLOYED ADDRESS
   },
 };
 
-// Common ERC20 token addresses for different networks
+// 3. Update TOKEN_ADDRESSES in contractService.ts with Linea tokens
 export const TOKEN_ADDRESSES = {
   // Mainnet
   [CHAIN_ID.MAINNET]: {
@@ -32,9 +34,16 @@ export const TOKEN_ADDRESSES = {
   },
   // Sepolia
   [CHAIN_ID.SEPOLIA]: {
-    WETH: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14', // Example Sepolia WETH - update with real address
-    USDC: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238', // Example Sepolia USDC - update with real address
-    DAI: '0x68194a729C2450ad26072b3D33ADaCbcef39D574', // Example Sepolia DAI - update with real address
+    WETH: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14', // Example Sepolia WETH
+    USDC: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238', // Example Sepolia USDC
+    DAI: '0x68194a729C2450ad26072b3D33ADaCbcef39D574', // Example Sepolia DAI
+  },
+  // Linea Mainnet
+  [CHAIN_ID.LINEA]: {
+    WETH: '0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f', // Linea WETH
+    USDC: '0x176211869cA2b568f2A7D4EE941E073a821EE1ff', // Linea USDC
+    USDT: '0xA219439258ca9da29E9Cc4cE5596924745e12B93', // Linea USDT
+    DAI: '0x4AF15ec2A0BD43Db75dd04E62FAA3B8EF36b00d5', // Linea DAI
   },
   // Polygon
   [CHAIN_ID.POLYGON]: {

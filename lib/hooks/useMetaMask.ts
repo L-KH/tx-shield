@@ -9,39 +9,40 @@ export const CHAIN_ID = {
   POLYGON: 137,
   ARBITRUM: 42161,
   OPTIMISM: 10,
+  LINEA: 59144, // Add Linea Mainnet
 };
 
-// Default to Sepolia for testing
+// Set Linea as the default for the hackathon
 export const DEFAULT_CHAIN_ID = 
   process.env.NEXT_PUBLIC_DEFAULT_CHAIN_ID ? 
   parseInt(process.env.NEXT_PUBLIC_DEFAULT_CHAIN_ID) : 
-  CHAIN_ID.SEPOLIA;
+  CHAIN_ID.LINEA;
 
-// Network names for display
 export const NETWORK_NAMES = {
   [CHAIN_ID.MAINNET]: 'Ethereum Mainnet',
   [CHAIN_ID.SEPOLIA]: 'Sepolia Testnet',
   [CHAIN_ID.POLYGON]: 'Polygon',
   [CHAIN_ID.ARBITRUM]: 'Arbitrum',
   [CHAIN_ID.OPTIMISM]: 'Optimism',
+  [CHAIN_ID.LINEA]: 'Linea Mainnet', // Add Linea name
 };
 
-// RPC URLs for each network
 export const RPC_URLS = {
   [CHAIN_ID.MAINNET]: 'https://mainnet.infura.io/v3/',
-  [CHAIN_ID.SEPOLIA]: process.env.NEXT_PUBLIC_RPC_URL || 'https://sepolia.infura.io/v3/',
+  [CHAIN_ID.SEPOLIA]: 'https://sepolia.infura.io/v3/',
   [CHAIN_ID.POLYGON]: 'https://polygon-mainnet.infura.io/v3/',
   [CHAIN_ID.ARBITRUM]: 'https://arbitrum-mainnet.infura.io/v3/',
   [CHAIN_ID.OPTIMISM]: 'https://optimism-mainnet.infura.io/v3/',
+  [CHAIN_ID.LINEA]: 'https://linea-mainnet.infura.io/v3/', // Add Linea RPC URL
 };
 
-// Block explorer URLs
 export const BLOCK_EXPLORERS = {
   [CHAIN_ID.MAINNET]: 'https://etherscan.io',
   [CHAIN_ID.SEPOLIA]: 'https://sepolia.etherscan.io',
   [CHAIN_ID.POLYGON]: 'https://polygonscan.com',
   [CHAIN_ID.ARBITRUM]: 'https://arbiscan.io',
   [CHAIN_ID.OPTIMISM]: 'https://optimistic.etherscan.io',
+  [CHAIN_ID.LINEA]: 'https://lineascan.build', // Add Linea block explorer
 };
 
 // Transaction interface for the methods we're adding
@@ -64,10 +65,9 @@ export interface MetaMaskHookResult {
   connect: () => Promise<boolean>;
   disconnect: () => void;
   switchNetwork: (chainId: number) => Promise<boolean>;
-  switchToSepolia: () => Promise<boolean>;
+  switchToLinea: () => Promise<boolean>; // Add this method
   getProvider: () => ethers.providers.Web3Provider | null;
   getSigner: () => ethers.providers.JsonRpcSigner | null;
-  // Add the missing methods
   interceptTransaction: () => Promise<TransactionRequest | null>;
   sendTransaction: (txData: TransactionRequest) => Promise<any>;
 }
@@ -239,7 +239,8 @@ export function useMetaMask(): MetaMaskHookResult {
   };
   
   // Switch specifically to Sepolia testnet
-  const switchToSepolia = () => switchNetwork(CHAIN_ID.SEPOLIA);
+  const switchToLinea = () => switchNetwork(CHAIN_ID.LINEA);
+
   
   // Add a new network to MetaMask if it doesn't exist
   const addNetwork = async (chainId: number): Promise<boolean> => {
@@ -260,6 +261,17 @@ export function useMetaMask(): MetaMaskHookResult {
         },
         rpcUrls: [RPC_URLS[CHAIN_ID.SEPOLIA]],
         blockExplorerUrls: [BLOCK_EXPLORERS[CHAIN_ID.SEPOLIA]],
+      },
+      [CHAIN_ID.LINEA]: {
+        chainId: `0x${CHAIN_ID.LINEA.toString(16)}`,
+        chainName: 'Linea Mainnet',
+        nativeCurrency: {
+          name: 'Ether',
+          symbol: 'ETH',
+          decimals: 18,
+        },
+        rpcUrls: [RPC_URLS[CHAIN_ID.LINEA]],
+        blockExplorerUrls: [BLOCK_EXPLORERS[CHAIN_ID.LINEA]],
       },
       // Add other networks here if needed
     };
@@ -375,7 +387,7 @@ export function useMetaMask(): MetaMaskHookResult {
     connect,
     disconnect,
     switchNetwork,
-    switchToSepolia,
+    switchToLinea, // Add this for Linea
     getProvider,
     getSigner,
     interceptTransaction,
