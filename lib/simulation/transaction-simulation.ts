@@ -181,8 +181,8 @@ class TenderlySimulation extends SimulationProvider {
       // ETH balance changes
       if (simData.transaction.balance_diff) {
         for (const [address, change] of Object.entries(simData.transaction.balance_diff)) {
-          const oldVal = ethers.BigNumber.from(change.old);
-          const newVal = ethers.BigNumber.from(change.new);
+          const oldVal = ethers.BigNumber.from((change as { old: string }).old);
+          const newVal =ethers.BigNumber.from((change as { new: string }).new);
           
           balanceChanges.push({
             address,
