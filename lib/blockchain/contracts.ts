@@ -1,21 +1,21 @@
-// app/lib/blockchain/contracts.ts
+
 import { ethers } from 'ethers';
 import TXShieldABI from '@/contracts/abis/TXShield.json';
 import ThreatRegistryABI from '@/contracts/abis/ThreatRegistry.json';
 
-// Deployed contract addresses - replace with your actual deployed addresses
+
 const CONTRACT_ADDRESSES = {
   TXShield: {
-    1: '0x0000000000000000000000000000000000000000', // Mainnet (placeholder)
-    5: '0x0000000000000000000000000000000000000000', // Goerli (placeholder)
-    11155111: '0xc076D95F95021D1fBBfe2BDB9692d656B7ddc846', // Sepolia
-    59144: '0xB31A5CdC928Ee7A3Ac915D5d196B733eb2C1b17B', // Linea Mainnet - REPLACE WITH YOUR ACTUAL DEPLOYED ADDRESS
+    1: '0x0000000000000000000000000000000000000000', 
+    5: '0x0000000000000000000000000000000000000000', 
+    11155111: '0xc076D95F95021D1fBBfe2BDB9692d656B7ddc846', 
+    59144: '0xB31A5CdC928Ee7A3Ac915D5d196B733eb2C1b17B', 
   },
   ThreatRegistry: {
-    1: '0x0000000000000000000000000000000000000000', // Mainnet (placeholder)
-    5: '0x0000000000000000000000000000000000000000', // Goerli (placeholder)
-    11155111: '0xE6597458679e0d8ca9AD31B7dA118E77560028e6', // Sepolia
-    59144: '0x963Cd3E7231fEc38cb658D23279dF9d25203b8f8', // Linea Mainnet - REPLACE WITH YOUR ACTUAL DEPLOYED ADDRESS
+    1: '0x0000000000000000000000000000000000000000', 
+    5: '0x0000000000000000000000000000000000000000', 
+    11155111: '0xE6597458679e0d8ca9AD31B7dA118E77560028e6', 
+    59144: '0x963Cd3E7231fEc38cb658D23279dF9d25203b8f8', 
   }
 };
 
@@ -23,14 +23,11 @@ export const NETWORK_NAMES = {
   1: 'Ethereum',
   5: 'Goerli',
   11155111: 'Sepolia',
-  59144: 'Linea', // Add Linea
+  59144: 'Linea', 
 };
 
-export const DEFAULT_CHAIN_ID = 59144; // Update to Linea for hackathon
+export const DEFAULT_CHAIN_ID = 59144; 
 
-/**
- * Get contract instance for TXShield
- */
 export async function getTXShieldContract(provider) {
   try {
     const signer = provider.getSigner();
@@ -48,9 +45,6 @@ export async function getTXShieldContract(provider) {
   }
 }
 
-/**
- * Get contract instance for ThreatRegistry
- */
 export async function getThreatRegistryContract(provider) {
   try {
     const signer = provider.getSigner();
@@ -68,14 +62,11 @@ export async function getThreatRegistryContract(provider) {
   }
 }
 
-/**
- * Check if an address is flagged as a threat
- */
 export async function checkAddressThreat(address) {
   try {
-    // For testing without provider, return mock data
+    
     if (process.env.NODE_ENV === 'development' && !window.ethereum) {
-      // Mock threat addresses for testing
+      
       const mockThreats = [
         '0xdef1c0ded9bec7f1a1670819833240f027b25eff',
         '0x4648a43b2c14da09fdf38bb7cf8ff5ba58f95b9f'
@@ -83,7 +74,7 @@ export async function checkAddressThreat(address) {
       return mockThreats.includes(address.toLowerCase());
     }
     
-    // Use real contract in production with connected wallet
+    
     if (window.ethereum) {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const threatRegistry = await getThreatRegistryContract(provider);
@@ -97,9 +88,6 @@ export async function checkAddressThreat(address) {
   }
 }
 
-/**
- * Execute a transaction securely through the TXShield contract
- */
 export async function executeSecureTransaction(to, value, data, threatLevel) {
   try {
     if (!window.ethereum) {
@@ -109,14 +97,14 @@ export async function executeSecureTransaction(to, value, data, threatLevel) {
     const provider = new ethers.providers.Web3Provider(window.ethereum);
     const txShield = await getTXShieldContract(provider);
     
-    // Convert ETH value to wei
+    
     const valueWei = ethers.utils.parseEther(value);
     
-    // Calculate fee (0.1% of transaction value)
+    
     const fee = valueWei.mul(10).div(10000);
     const totalValue = valueWei.add(fee);
     
-    // Execute transaction through TXShield contract
+    
     const tx = await txShield.secureExecute(
       to,
       valueWei,
@@ -133,9 +121,6 @@ export async function executeSecureTransaction(to, value, data, threatLevel) {
   }
 }
 
-/**
- * Get transaction history for the current user
- */
 export async function getUserTransactionHistory() {
   try {
     if (!window.ethereum) {
@@ -147,7 +132,7 @@ export async function getUserTransactionHistory() {
     const signer = provider.getSigner();
     const address = await signer.getAddress();
     
-    // Get transaction history (first 10 transactions)
+    
     const history = await txShield.getUserTransactionHistory(address, 0, 10);
     return history;
   } catch (error) {
@@ -156,9 +141,6 @@ export async function getUserTransactionHistory() {
   }
 }
 
-/**
- * Set user security settings
- */
 export async function updateSecuritySettings(settings) {
   try {
     if (!window.ethereum) {
@@ -177,9 +159,6 @@ export async function updateSecuritySettings(settings) {
   }
 }
 
-/**
- * Perform a safe token approval with limits
- */
 export async function safeApprove(tokenAddress, spenderAddress, amount) {
   try {
     if (!window.ethereum) {
@@ -189,8 +168,8 @@ export async function safeApprove(tokenAddress, spenderAddress, amount) {
     const provider = new ethers.providers.Web3Provider(window.ethereum);
     const txShield = await getTXShieldContract(provider);
     
-    // Convert amount to wei
-    const amountWei = ethers.utils.parseUnits(amount, 18); // Assuming 18 decimals, adjust as needed
+    
+    const amountWei = ethers.utils.parseUnits(amount, 18); 
     
     const tx = await txShield.safeApprove(tokenAddress, spenderAddress, amountWei);
     const receipt = await tx.wait();

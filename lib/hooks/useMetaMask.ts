@@ -1,18 +1,18 @@
-// lib/blockchain/useMetaMask.ts
+
 import { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 
-// Chain IDs for different networks
+
 export const CHAIN_ID = {
   MAINNET: 1,
   SEPOLIA: 11155111,
   POLYGON: 137,
   ARBITRUM: 42161,
   OPTIMISM: 10,
-  LINEA: 59144, // Add Linea Mainnet
+  LINEA: 59144, 
 };
 
-// Set Linea as the default for the hackathon
+
 export const DEFAULT_CHAIN_ID = 
   process.env.NEXT_PUBLIC_DEFAULT_CHAIN_ID ? 
   parseInt(process.env.NEXT_PUBLIC_DEFAULT_CHAIN_ID) : 
@@ -24,7 +24,7 @@ export const NETWORK_NAMES = {
   [CHAIN_ID.POLYGON]: 'Polygon',
   [CHAIN_ID.ARBITRUM]: 'Arbitrum',
   [CHAIN_ID.OPTIMISM]: 'Optimism',
-  [CHAIN_ID.LINEA]: 'Linea Mainnet', // Add Linea name
+  [CHAIN_ID.LINEA]: 'Linea Mainnet', 
 };
 
 export const RPC_URLS = {
@@ -33,7 +33,7 @@ export const RPC_URLS = {
   [CHAIN_ID.POLYGON]: 'https://polygon-mainnet.infura.io/v3/',
   [CHAIN_ID.ARBITRUM]: 'https://arbitrum-mainnet.infura.io/v3/',
   [CHAIN_ID.OPTIMISM]: 'https://optimism-mainnet.infura.io/v3/',
-  [CHAIN_ID.LINEA]: 'https://linea-mainnet.infura.io/v3/', // Add Linea RPC URL
+  [CHAIN_ID.LINEA]: 'https://linea-mainnet.infura.io/v3/', 
 };
 
 export const BLOCK_EXPLORERS = {
@@ -42,10 +42,10 @@ export const BLOCK_EXPLORERS = {
   [CHAIN_ID.POLYGON]: 'https://polygonscan.com',
   [CHAIN_ID.ARBITRUM]: 'https://arbiscan.io',
   [CHAIN_ID.OPTIMISM]: 'https://optimistic.etherscan.io',
-  [CHAIN_ID.LINEA]: 'https://lineascan.build', // Add Linea block explorer
+  [CHAIN_ID.LINEA]: 'https://lineascan.build', 
 };
 
-// Transaction interface for the methods we're adding
+
 export interface TransactionRequest {
   to: string;
   from: string;
@@ -54,7 +54,7 @@ export interface TransactionRequest {
   chainId: number;
 }
 
-// Define the return type of the useMetaMask hook
+
 export interface MetaMaskHookResult {
   account: string | null;
   chainId: number | null;
@@ -65,78 +65,74 @@ export interface MetaMaskHookResult {
   connect: () => Promise<boolean>;
   disconnect: () => void;
   switchNetwork: (chainId: number) => Promise<boolean>;
-  switchToLinea: () => Promise<boolean>; // Add this method
+  switchToLinea: () => Promise<boolean>; 
   getProvider: () => ethers.providers.Web3Provider | null;
   getSigner: () => ethers.providers.JsonRpcSigner | null;
   interceptTransaction: () => Promise<TransactionRequest | null>;
   sendTransaction: (txData: TransactionRequest) => Promise<any>;
 }
 
-/**
- * Custom hook for MetaMask integration
- * Handles wallet connection, network switching, and account tracking
- */
 export function useMetaMask(): MetaMaskHookResult {
-  // State variables
+  
   const [account, setAccount] = useState<string | null>(null);
   const [chainId, setChainId] = useState<number | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Check if the current network is the expected one (Sepolia by default)
+  
   const isCorrectNetwork = chainId === DEFAULT_CHAIN_ID;
   
-  // Get the current network name
+  
   const networkName = chainId ? NETWORK_NAMES[chainId] || 'Unknown Network' : 'Not Connected';
   
-  // Utility to check for MetaMask
+  
   const checkForMetaMask = useCallback((): boolean => {
     if (typeof window === 'undefined') return false;
     return window.ethereum !== undefined;
   }, []);
   
-  // Handle account changes
+  
   const handleAccountsChanged = useCallback((accounts: string[]) => {
     if (accounts.length === 0) {
-      // User has disconnected all accounts
+      
       setAccount(null);
       setError('Please connect to MetaMask');
     } else {
-      // Use the first account
+      
       setAccount(ethers.utils.getAddress(accounts[0]));
       setError(null);
     }
   }, []);
   
-  // Handle chain/network changes
+  
   const handleChainChanged = useCallback((chainIdHex: string) => {
-    // Convert hex chainId to number
+    
     const newChainId = parseInt(chainIdHex, 16);
     setChainId(newChainId);
     
-    // Show a warning if not on the expected network
+    
     if (newChainId !== DEFAULT_CHAIN_ID) {
       setError(`Please switch to ${NETWORK_NAMES[DEFAULT_CHAIN_ID] || 'the correct network'}`);
     } else {
       setError(null);
     }
     
-    // MetaMask recommends reloading the page on chain change
-    // But for a better UX, we'll just update the state
+    
+    
   }, []);
   
-  // Initialize and set up event listeners
+  
   useEffect(() => {
     if (!checkForMetaMask()) return;
     
     const init = async () => {
       try {
-        // Check if already connected
+        
         const accounts = await window.ethereum.request({ method: 'eth_accounts' });
         if (accounts.length > 0) {
           handleAccountsChanged(accounts);
           
-          // Get current chain
+          
           const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
           handleChainChanged(chainIdHex);
         }
@@ -145,15 +141,15 @@ export function useMetaMask(): MetaMaskHookResult {
       }
     };
     
-    // Run initialization
+    
     init();
     
-    // Set up event listeners
+    
     if (window.ethereum) {
       window.ethereum.on('accountsChanged', handleAccountsChanged);
       window.ethereum.on('chainChanged', handleChainChanged);
       
-      // Clean up event listeners when component unmounts
+      
       return () => {
         if (window.ethereum.removeListener) {
           window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
@@ -163,7 +159,7 @@ export function useMetaMask(): MetaMaskHookResult {
     }
   }, [handleAccountsChanged, handleChainChanged, checkForMetaMask]);
   
-  // Connect to MetaMask
+  
   const connect = async (): Promise<boolean> => {
     if (!checkForMetaMask()) {
       setError('MetaMask not installed. Please install MetaMask to continue.');
@@ -174,16 +170,16 @@ export function useMetaMask(): MetaMaskHookResult {
     setError(null);
     
     try {
-      // Request account access
+      
       const accounts = await window.ethereum.request({
         method: 'eth_requestAccounts',
       });
       
-      // Update account state
+      
       if (accounts.length > 0) {
         handleAccountsChanged(accounts);
         
-        // Get and set current chain ID
+        
         const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
         handleChainChanged(chainIdHex);
         
@@ -193,7 +189,7 @@ export function useMetaMask(): MetaMaskHookResult {
         return false;
       }
     } catch (err: any) {
-      // Handle user rejection
+      
       if (err.code === 4001) {
         setError('Please connect to MetaMask');
       } else {
@@ -206,14 +202,14 @@ export function useMetaMask(): MetaMaskHookResult {
     }
   };
   
-  // Disconnect (clear state)
+  
   const disconnect = () => {
     setAccount(null);
-    // Note: MetaMask doesn't support programmatic disconnection
-    // This just clears our local state
+    
+    
   };
   
-  // Switch to a different network
+  
   const switchNetwork = async (chainId: number): Promise<boolean> => {
     if (!checkForMetaMask() || !window.ethereum) {
       setError('MetaMask not installed');
@@ -221,14 +217,14 @@ export function useMetaMask(): MetaMaskHookResult {
     }
     
     try {
-      // Request network switch
+      
       await window.ethereum.request({
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: `0x${chainId.toString(16)}` }],
       });
       return true;
     } catch (err: any) {
-      // Error code 4902 means the chain is not added to MetaMask
+      
       if (err.code === 4902) {
         return await addNetwork(chainId);
       }
@@ -238,18 +234,18 @@ export function useMetaMask(): MetaMaskHookResult {
     }
   };
   
-  // Switch specifically to Sepolia testnet
+  
   const switchToLinea = () => switchNetwork(CHAIN_ID.LINEA);
 
   
-  // Add a new network to MetaMask if it doesn't exist
+  
   const addNetwork = async (chainId: number): Promise<boolean> => {
     if (!checkForMetaMask()) {
       setError('MetaMask not installed');
       return false;
     }
     
-    // Network configurations
+    
     const networks = {
       [CHAIN_ID.SEPOLIA]: {
         chainId: `0x${CHAIN_ID.SEPOLIA.toString(16)}`,
@@ -273,16 +269,16 @@ export function useMetaMask(): MetaMaskHookResult {
         rpcUrls: [RPC_URLS[CHAIN_ID.LINEA]],
         blockExplorerUrls: [BLOCK_EXPLORERS[CHAIN_ID.LINEA]],
       },
-      // Add other networks here if needed
+      
     };
     
     try {
-      // Exit early if network config is not available
+      
       if (!networks[chainId]) {
         throw new Error(`Network configuration for chain ID ${chainId} not available`);
       }
       
-      // Add the network to MetaMask
+      
       await window.ethereum.request({
         method: 'wallet_addEthereumChain',
         params: [networks[chainId]],
@@ -295,20 +291,20 @@ export function useMetaMask(): MetaMaskHookResult {
     }
   };
   
-  // Get Ethereum provider
+  
   const getProvider = () => {
     if (!checkForMetaMask()) return null;
     return new ethers.providers.Web3Provider(window.ethereum);
   };
   
-  // Get signer for sending transactions
+  
   const getSigner = () => {
     const provider = getProvider();
     if (!provider) return null;
     return provider.getSigner();
   };
   
-  // Intercept a transaction from MetaMask for analysis
+  
   const interceptTransaction = async (): Promise<TransactionRequest | null> => {
     if (!checkForMetaMask() || !account) {
       setError('MetaMask not connected');
@@ -316,24 +312,24 @@ export function useMetaMask(): MetaMaskHookResult {
     }
     
     try {
-      // In a real implementation, you might hook into MetaMask's transaction flow
-      // For now, we'll simulate it with a mock implementation
-      // This would typically be replaced with actual code that integrates with MetaMask
       
-      // Ask MetaMask for the pending transaction
-      // This is a placeholder - in reality, you would need to implement a method
-      // to capture the transaction before it's sent
       
-      // Get user's current network and account
+      
+      
+      
+      
+      
+      
+      
       const currentChainId = chainId || DEFAULT_CHAIN_ID;
       
-      // Create a sample transaction for testing purposes
-      // In a real implementation, this would come from MetaMask
+      
+      
       const interceptedTx: TransactionRequest = {
-        to: '', // This would be populated with the actual 'to' address
+        to: '', 
         from: account,
-        data: '', // Transaction data (hex string)
-        value: '0', // Transaction value in wei
+        data: '', 
+        value: '0', 
         chainId: currentChainId
       };
       
@@ -345,7 +341,7 @@ export function useMetaMask(): MetaMaskHookResult {
     }
   };
   
-  // Send a transaction through MetaMask
+  
   const sendTransaction = async (txData: TransactionRequest): Promise<any> => {
     if (!checkForMetaMask() || !account) {
       setError('MetaMask not connected');
@@ -358,7 +354,7 @@ export function useMetaMask(): MetaMaskHookResult {
         throw new Error('No signer available');
       }
       
-      // Convert our TransactionRequest to the format ethers expects
+      
       const tx = {
         to: txData.to,
         from: txData.from,
@@ -367,7 +363,7 @@ export function useMetaMask(): MetaMaskHookResult {
         chainId: txData.chainId
       };
       
-      // Send the transaction
+      
       return await signer.sendTransaction(tx);
     } catch (err: any) {
       console.error('Transaction failed:', err);
@@ -376,7 +372,7 @@ export function useMetaMask(): MetaMaskHookResult {
     }
   };
   
-  // Return the hook interface
+  
   return {
     account,
     chainId,
@@ -387,7 +383,7 @@ export function useMetaMask(): MetaMaskHookResult {
     connect,
     disconnect,
     switchNetwork,
-    switchToLinea, // Add this for Linea
+    switchToLinea, 
     getProvider,
     getSigner,
     interceptTransaction,

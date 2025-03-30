@@ -1,5 +1,5 @@
-// lib/blockchain/wallet.ts
-// A minimal implementation to ensure the file exists
+
+
 
 import { ethers } from 'ethers';
 
@@ -26,7 +26,7 @@ export async function getChainId() {
       const network = await provider.getNetwork();
       return network.chainId;
     }
-    return 1; // Default to Ethereum mainnet
+    return 1; 
   } catch (error) {
     console.error('Error getting chain ID:', error);
     return 1;

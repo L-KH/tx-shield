@@ -1,43 +1,43 @@
-// lib/analysis/transaction-type-detector.ts
+
 import { ethers } from 'ethers';
 
-// Common ERC20 & DEX function signatures
+
 const FUNCTION_SIGNATURES = {
-  // ERC20
-  transfer: '0xa9059cbb', // transfer(address,uint256)
-  transferFrom: '0x23b872dd', // transferFrom(address,address,uint256)
-  approve: '0x095ea7b3', // approve(address,uint256)
   
-  // Uniswap V2
-  swapExactTokensForTokens: '0x38ed1739', // swapExactTokensForTokens(uint256,uint256,address[],address,uint256)
-  swapTokensForExactTokens: '0x8803dbee', // swapTokensForExactTokens(uint256,uint256,address[],address,uint256)
-  swapExactETHForTokens: '0x7ff36ab5', // swapExactETHForTokens(uint256,address[],address,uint256)
-  swapTokensForExactETH: '0x4a25d94a', // swapTokensForExactETH(uint256,uint256,address[],address,uint256)
-  swapExactTokensForETH: '0x18cbafe5', // swapExactTokensForETH(uint256,uint256,address[],address,uint256)
-  swapETHForExactTokens: '0xfb3bdb41', // swapETHForExactTokens(uint256,address[],address,uint256)
+  transfer: '0xa9059cbb', 
+  transferFrom: '0x23b872dd', 
+  approve: '0x095ea7b3', 
   
-  // Uniswap V3
-  exactInputSingle: '0x414bf389', // exactInputSingle(tuple)
-  exactOutputSingle: '0xdb3e2198', // exactOutputSingle(tuple)
-  exactInput: '0xc04b8d59', // exactInput(tuple)
-  exactOutput: '0xf28c0498', // exactOutput(tuple)
   
-  // NFT - ERC721
-  safeTransferFrom: '0x42842e0e', // safeTransferFrom(address,address,uint256)
-  safeTransferFromWithData: '0xb88d4fde', // safeTransferFrom(address,address,uint256,bytes)
-  setApprovalForAll: '0xa22cb465', // setApprovalForAll(address,bool)
+  swapExactTokensForTokens: '0x38ed1739', 
+  swapTokensForExactTokens: '0x8803dbee', 
+  swapExactETHForTokens: '0x7ff36ab5', 
+  swapTokensForExactETH: '0x4a25d94a', 
+  swapExactTokensForETH: '0x18cbafe5', 
+  swapETHForExactTokens: '0xfb3bdb41', 
   
-  // DEX - Liquidity
-  addLiquidity: '0xe8e33700', // addLiquidity(address,address,uint256,uint256,uint256,uint256,address,uint256)
-  addLiquidityETH: '0xf305d719', // addLiquidityETH(address,uint256,uint256,uint256,address,uint256)
-  removeLiquidity: '0xbaa2abde', // removeLiquidity(address,address,uint256,uint256,uint256,address,uint256)
-  removeLiquidityETH: '0x02751cec', // removeLiquidityETH(address,uint256,uint256,uint256,address,uint256)
   
-  // Lending protocols
-  deposit: '0xb6b55f25', // deposit(uint256)
-  withdraw: '0x2e1a7d4d', // withdraw(uint256)
-  borrow: '0xc5ebeaec', // borrow(uint256)
-  repay: '0x4e4d9fea', // repay(uint256)
+  exactInputSingle: '0x414bf389', 
+  exactOutputSingle: '0xdb3e2198', 
+  exactInput: '0xc04b8d59', 
+  exactOutput: '0xf28c0498', 
+  
+  
+  safeTransferFrom: '0x42842e0e', 
+  safeTransferFromWithData: '0xb88d4fde', 
+  setApprovalForAll: '0xa22cb465', 
+  
+  
+  addLiquidity: '0xe8e33700', 
+  addLiquidityETH: '0xf305d719', 
+  removeLiquidity: '0xbaa2abde', 
+  removeLiquidityETH: '0x02751cec', 
+  
+  
+  deposit: '0xb6b55f25', 
+  withdraw: '0x2e1a7d4d', 
+  borrow: '0xc5ebeaec', 
+  repay: '0x4e4d9fea', 
 };
 
 export enum TransactionType {
@@ -89,7 +89,7 @@ interface TransactionAnalysis {
       multiActions?: string[];
       involvedTokens?: string[];
       ethValue?: string;
-      dataSize?: number; // Add this line to fix the error
+      dataSize?: number; 
     };
   }
 
@@ -99,7 +99,7 @@ export function analyzeTransactionType(transaction: {
   value: string;
   from: string;
 }): TransactionAnalysis {
-  // Default analysis
+  
   let analysis: TransactionAnalysis = {
     type: TransactionType.Unknown,
     complexity: TransactionComplexity.Simple,
@@ -108,7 +108,7 @@ export function analyzeTransactionType(transaction: {
     details: {},
   };
   
-  // For empty data and non-zero value, it's a simple ETH transfer
+  
   if ((!transaction.data || transaction.data === '0x') && transaction.value && transaction.value !== '0') {
     return {
       type: TransactionType.Transfer,
@@ -121,7 +121,7 @@ export function analyzeTransactionType(transaction: {
     };
   }
   
-  // For empty data and zero value, it might be a contract initialization
+  
   if ((!transaction.data || transaction.data === '0x') && (!transaction.value || transaction.value === '0')) {
     return {
       type: TransactionType.Unknown,
@@ -132,7 +132,7 @@ export function analyzeTransactionType(transaction: {
     };
   }
   
-  // No contract address means contract deployment
+  
   if (!transaction.to && transaction.data && transaction.data !== '0x') {
     return {
       type: TransactionType.ContractDeployment,
@@ -145,15 +145,15 @@ export function analyzeTransactionType(transaction: {
     };
   }
   
-  // Get the function signature (first 4 bytes of the data)
+  
   const functionSignature = transaction.data?.slice(0, 10).toLowerCase();
   
-  // Analyze based on function signature
+  
   switch (functionSignature) {
-    // ERC20 Transfers
+    
     case FUNCTION_SIGNATURES.transfer:
       try {
-        // Decode transfer parameters
+        
         const decodedData = ethers.utils.defaultAbiCoder.decode(
           ['address', 'uint256'],
           '0x' + transaction.data.slice(10)
@@ -180,10 +180,10 @@ export function analyzeTransactionType(transaction: {
         };
       }
     
-    // ERC20 Approvals
+    
     case FUNCTION_SIGNATURES.approve:
       try {
-        // Decode approve parameters
+        
         const decodedData = ethers.utils.defaultAbiCoder.decode(
           ['address', 'uint256'],
           '0x' + transaction.data.slice(10)
@@ -191,9 +191,9 @@ export function analyzeTransactionType(transaction: {
         const spenderAddress = decodedData[0];
         const amount = decodedData[1];
         
-        // Check for unlimited approval
+        
         const isUnlimited = amount.eq(ethers.constants.MaxUint256) || 
-          amount.gte(ethers.utils.parseEther('1000000000')); // 1 billion ETH is effectively unlimited
+          amount.gte(ethers.utils.parseEther('1000000000')); 
         
         return {
           type: isUnlimited ? TransactionType.UnlimitedApproval : TransactionType.Approval,
@@ -217,7 +217,7 @@ export function analyzeTransactionType(transaction: {
         };
       }
     
-    // Swap functions
+    
     case FUNCTION_SIGNATURES.swapExactTokensForTokens:
     case FUNCTION_SIGNATURES.swapTokensForExactTokens:
       return {
@@ -267,7 +267,7 @@ export function analyzeTransactionType(transaction: {
         },
       };
     
-    // NFT transfers and approvals
+    
     case FUNCTION_SIGNATURES.safeTransferFrom:
     case FUNCTION_SIGNATURES.safeTransferFromWithData:
       return {
@@ -283,7 +283,7 @@ export function analyzeTransactionType(transaction: {
     
     case FUNCTION_SIGNATURES.setApprovalForAll:
       try {
-        // Decode setApprovalForAll parameters
+        
         const decodedData = ethers.utils.defaultAbiCoder.decode(
           ['address', 'bool'],
           '0x' + transaction.data.slice(10)
@@ -312,7 +312,7 @@ export function analyzeTransactionType(transaction: {
         };
       }
     
-    // Liquidity provision
+    
     case FUNCTION_SIGNATURES.addLiquidity:
     case FUNCTION_SIGNATURES.addLiquidityETH:
       return {
@@ -349,7 +349,7 @@ export function analyzeTransactionType(transaction: {
         },
       };
     
-    // Lending protocols
+    
     case FUNCTION_SIGNATURES.deposit:
       return {
         type: TransactionType.Lending,
@@ -401,7 +401,7 @@ export function analyzeTransactionType(transaction: {
       };
     
     default:
-      // Try to match Uniswap V3 functions which use tuple parameters
+      
       if (
         functionSignature === FUNCTION_SIGNATURES.exactInputSingle ||
         functionSignature === FUNCTION_SIGNATURES.exactOutputSingle ||
@@ -421,7 +421,7 @@ export function analyzeTransactionType(transaction: {
         };
       }
       
-      // If we get here, it's an unknown transaction type
+      
       return {
         ...analysis,
         complexity: transaction.data.length > 1000 
@@ -438,20 +438,20 @@ export function analyzeTransactionType(transaction: {
   }
 }
 
-// Helper function to detect protocol based on contract address
+
 function detectProtocol(address?: string): string {
   if (!address) return 'Unknown';
   
-  // This would be a more comprehensive list in production
+  
   const knownProtocols = {
-    // Uniswap
+    
     '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D': 'Uniswap V2',
     '0xE592427A0AEce92De3Edee1F18E0157C05861564': 'Uniswap V3',
-    // SushiSwap
+    
     '0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F': 'SushiSwap',
-    // AAVE
+    
     '0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9': 'Aave V2',
-    // Compound
+    
     '0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B': 'Compound',
   };
   
@@ -465,5 +465,5 @@ function detectProtocol(address?: string): string {
   return 'Unknown';
 }
 
-// Export the function for use in your application
+
 export default analyzeTransactionType;

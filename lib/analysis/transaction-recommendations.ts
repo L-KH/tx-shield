@@ -1,4 +1,4 @@
-// lib/analysis/transaction-recommendations.ts
+
 import { ethers } from 'ethers';
 import { 
   analyzeTransactionType, 
@@ -7,7 +7,7 @@ import {
 } from './transaction-type-detector';
 import { calculateRiskScore, collectRiskFactors } from './risk-scoring';
 
-// Define recommendation categories
+
 export enum RecommendationType {
   Security = 'SECURITY',
   Privacy = 'PRIVACY',
@@ -16,7 +16,7 @@ export enum RecommendationType {
   BestPractice = 'BEST_PRACTICE'
 }
 
-// Define recommendation interface
+
 export interface Recommendation {
   type: RecommendationType;
   title: string;
@@ -25,15 +25,15 @@ export interface Recommendation {
   action?: {
     type: 'REPLACE_TX' | 'MODIFY_PARAM' | 'USE_DIFFERENT_CONTRACT' | 'EXTERNAL_TOOL';
     description: string;
-    data?: any; // For replacement transaction data
+    data?: any; 
   };
   priority: 'critical' | 'high' | 'medium' | 'low';
-  appliesTo: TransactionType[]; // Which transaction types this applies to
+  appliesTo: TransactionType[]; 
 }
 
-// Catalog of recommendations
+
 const recommendationCatalog: Recommendation[] = [
-  // Token Approval Recommendations
+  
   {
     type: RecommendationType.Security,
     title: 'Limit Token Approval Amount',
@@ -71,7 +71,7 @@ const recommendationCatalog: Recommendation[] = [
     appliesTo: [TransactionType.Approval, TransactionType.UnlimitedApproval]
   },
   
-  // Swap Recommendations
+  
   {
     type: RecommendationType.Security,
     title: 'Set Maximum Slippage',
@@ -141,7 +141,7 @@ const recommendationCatalog: Recommendation[] = [
     ]
   },
   
-  // Transfer Recommendations
+  
   {
     type: RecommendationType.Security,
     title: 'Verify Recipient Address',
@@ -163,7 +163,7 @@ const recommendationCatalog: Recommendation[] = [
     appliesTo: [TransactionType.Transfer]
   },
   
-  // NFT Recommendations
+  
   {
     type: RecommendationType.Security,
     title: 'Limit NFT Approvals',
@@ -173,7 +173,7 @@ const recommendationCatalog: Recommendation[] = [
     appliesTo: [TransactionType.NFTApproval]
   },
   
-  // Liquidity Recommendations
+  
   {
     type: RecommendationType.Security,
     title: 'Understand Impermanent Loss',
@@ -183,7 +183,7 @@ const recommendationCatalog: Recommendation[] = [
     appliesTo: [TransactionType.AddLiquidity]
   },
   
-  // Generic Recommendations
+  
   {
     type: RecommendationType.Security,
     title: 'Use TX Shield Secure Execution',
@@ -205,9 +205,6 @@ const recommendationCatalog: Recommendation[] = [
   },
 ];
 
-/**
- * Generate recommendations for a transaction based on its type and risk analysis
- */
 export async function getRecommendations(
   transaction: {
     to: string;
@@ -218,10 +215,10 @@ export async function getRecommendations(
   },
   provider?: ethers.providers.Provider
 ): Promise<Recommendation[]> {
-  // Analyze the transaction type
+  
   const txAnalysis = analyzeTransactionType(transaction);
   
-  // Collect risk factors if provider is available
+  
   let riskFactors = {};
   let riskScore = null;
   
@@ -230,12 +227,12 @@ export async function getRecommendations(
     riskScore = await calculateRiskScore(transaction, riskFactors, provider);
   }
   
-  // Filter recommendations that apply to this transaction type
+  
   let applicableRecommendations = recommendationCatalog.filter(rec => 
     rec.appliesTo.includes(txAnalysis.type)
   );
   
-  // Add security level specific recommendations
+  
   if (riskScore && riskScore.level >= SecurityRiskLevel.High) {
     applicableRecommendations.push({
       type: RecommendationType.Security,
@@ -246,15 +243,15 @@ export async function getRecommendations(
       appliesTo: [txAnalysis.type]
     });
     
-    // Add risk-specific recommendations
+    
     if (riskScore.breakdown.riskFlags.length > 0) {
       for (const flag of riskScore.breakdown.riskFlags) {
         if (flag.includes('unlimited approval')) {
-          // Already covered by unlimited approval recommendation
+          
           continue;
         }
         
-        // Add custom recommendation based on risk flag
+        
         applicableRecommendations.push({
           type: RecommendationType.Security,
           title: `Risk: ${flag}`,
@@ -266,10 +263,10 @@ export async function getRecommendations(
       }
     }
     
-    // Add suggested mitigations as recommendations
+    
     if (riskScore.breakdown.suggestedMitigations.length > 0) {
       for (const mitigation of riskScore.breakdown.suggestedMitigations) {
-        // Check if similar recommendation already exists
+        
         const exists = applicableRecommendations.some(rec => 
           rec.description.toLowerCase().includes(mitigation.toLowerCase()) ||
           rec.title.toLowerCase().includes(mitigation.toLowerCase())
@@ -289,16 +286,16 @@ export async function getRecommendations(
     }
   }
   
-  // Add transaction-specific enhancements
+  
   switch (txAnalysis.type) {
     case TransactionType.UnlimitedApproval:
-      // For unlimited approvals, ensure limited approval is the first recommendation
+      
       const limitApprovalRec = applicableRecommendations.find(rec => 
         rec.title === 'Limit Token Approval Amount'
       );
       
       if (limitApprovalRec) {
-        // Create concrete transaction replacement data
+        
         try {
           const decodedData = ethers.utils.defaultAbiCoder.decode(
             ['address', 'uint256'],
@@ -307,10 +304,10 @@ export async function getRecommendations(
           
           const spenderAddress = decodedData[0];
           
-          // Create a limited approval amount (e.g., 10 tokens with 18 decimals)
+          
           const limitedAmount = ethers.utils.parseUnits('10', 18);
           
-          // Re-encode the approval with limited amount
+          
           const approveInterface = new ethers.utils.Interface([
             'function approve(address spender, uint256 amount) external returns (bool)'
           ]);
@@ -319,7 +316,7 @@ export async function getRecommendations(
             spenderAddress, limitedAmount
           ]);
           
-          // Update the recommendation with concrete replacement data
+          
           limitApprovalRec.action.data = {
             ...transaction,
             data: saferData
@@ -334,15 +331,15 @@ export async function getRecommendations(
     case TransactionType.SwapTokensForETH:
     case TransactionType.SwapTokensForTokens:
     case TransactionType.Swap:
-      // For swaps, add specific slippage recommendations
+      
       const slippageRec = applicableRecommendations.find(rec => 
         rec.title === 'Set Maximum Slippage'
       );
       
       if (slippageRec) {
-        // In a real implementation, this would decode the specific DEX function
-        // and modify its parameters to include appropriate slippage
-        // For now, we'll just add a placeholder
+        
+        
+        
         slippageRec.action.data = {
           slippagePercentage: 1,
           description: 'Set maximum slippage to 1%'
@@ -351,7 +348,7 @@ export async function getRecommendations(
       break;
   }
   
-  // Sort recommendations by priority
+  
   return applicableRecommendations.sort((a, b) => {
     const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
     return priorityOrder[a.priority] - priorityOrder[b.priority];

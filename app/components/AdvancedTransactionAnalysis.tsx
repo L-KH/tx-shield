@@ -1,4 +1,4 @@
-// components/AdvancedTransactionAnalysis.tsx
+
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
@@ -20,7 +20,7 @@ import { SecurityRiskLevel, TransactionType } from '@/lib/analysis/transaction-t
 import { RecommendationType } from '@/lib/analysis/transaction-recommendations';
 import InfoTooltip, { DeFiGlossary } from './ui/Tooltip';
 
-// Types for props
+
 interface AdvancedTransactionAnalysisProps {
   analysisResult: {
     txType: TransactionType;
@@ -81,23 +81,23 @@ const AdvancedTransactionAnalysis: React.FC<AdvancedTransactionAnalysisProps> = 
     }));
   };
   
-  // Color mapping for risk levels
+  
   const riskLevelColors = {
-    [SecurityRiskLevel.Low]: '#10B981', // green
-    [SecurityRiskLevel.Medium]: '#F59E0B', // amber
-    [SecurityRiskLevel.High]: '#EF4444', // red
-    [SecurityRiskLevel.Critical]: '#991B1B', // dark red
+    [SecurityRiskLevel.Low]: '#10B981', 
+    [SecurityRiskLevel.Medium]: '#F59E0B', 
+    [SecurityRiskLevel.High]: '#EF4444', 
+    [SecurityRiskLevel.Critical]: '#991B1B', 
   };
   
-  // Priority colors
+  
   const priorityColors = {
-    critical: '#991B1B', // dark red
-    high: '#EF4444', // red
-    medium: '#F59E0B', // amber
-    low: '#10B981', // green
+    critical: '#991B1B', 
+    high: '#EF4444', 
+    medium: '#F59E0B', 
+    low: '#10B981', 
   };
   
-  // Transaction type icons
+  
   const getTransactionTypeIcon = () => {
     switch (analysisResult.txType) {
       case TransactionType.Transfer:
@@ -118,7 +118,7 @@ const AdvancedTransactionAnalysis: React.FC<AdvancedTransactionAnalysisProps> = 
     }
   };
   
-  // Risk score indicator
+  
   const renderRiskScoreIndicator = () => {
     const score = analysisResult.securityScore;
     const color = riskLevelColors[analysisResult.riskLevel];
@@ -174,7 +174,7 @@ const AdvancedTransactionAnalysis: React.FC<AdvancedTransactionAnalysisProps> = 
     );
   };
   
-  // Render transaction details
+  
   const renderTransactionDetails = () => {
     return (
       <div className="bg-gray-800 rounded-lg overflow-hidden mt-6">
@@ -249,7 +249,7 @@ const AdvancedTransactionAnalysis: React.FC<AdvancedTransactionAnalysisProps> = 
     );
   };
   
-  // Render risk breakdown
+  
   const renderRiskBreakdown = () => {
     const data = [
       { name: 'Contract Security', value: analysisResult.riskBreakdown.contractSecurity, color: '#3B82F6' },
@@ -329,7 +329,7 @@ const AdvancedTransactionAnalysis: React.FC<AdvancedTransactionAnalysisProps> = 
     );
   };
   
-  // Render flags
+  
   const renderFlags = () => {
     return (
       <div className="bg-gray-800 rounded-lg overflow-hidden mt-6">
@@ -381,7 +381,7 @@ const AdvancedTransactionAnalysis: React.FC<AdvancedTransactionAnalysisProps> = 
     );
   };
   
-  // Render recommendations
+  
   const renderRecommendations = () => {
     return (
       <div className="bg-gray-800 rounded-lg overflow-hidden mt-6">

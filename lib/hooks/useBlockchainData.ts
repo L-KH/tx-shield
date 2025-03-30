@@ -1,4 +1,4 @@
-// lib/hooks/useBlockchainData.ts
+
 import { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import useMetaMask from './useMetaMask';
@@ -11,7 +11,7 @@ import {
   TokenMetadata
 } from '../blockchain/contractService';
 
-// The structure for a token with balance
+
 export interface TokenWithBalance {
   metadata: TokenMetadata;
   balance: string;
@@ -19,12 +19,12 @@ export interface TokenWithBalance {
   priceUSD: number | null;
 }
 
-// Interface for token prices
+
 interface TokenPrices {
   [tokenSymbol: string]: number;
 }
 
-// Transaction structure
+
 export interface Transaction {
   user: string;
   target: string;
@@ -36,7 +36,7 @@ export interface Transaction {
   hash?: string;
 }
 
-// Blockchain state interface
+
 export interface BlockchainState {
   blockNumber: number | null;
   gasPrice: string | null;
@@ -49,15 +49,15 @@ export interface BlockchainState {
   allowances: Record<string, string>;
 }
 
-// Hook for accessing blockchain data
+
 export default function useBlockchainData() {
   const { account, chainId, getProvider } = useMetaMask();
   const isConnected = !!account;
   
-  // Get the provider instance
+  
   const provider = getProvider();
   
-  // Internal state
+  
   const [state, setState] = useState<BlockchainState>({
     blockNumber: null,
     gasPrice: null,
@@ -70,7 +70,7 @@ export default function useBlockchainData() {
     allowances: {},
   });
   
-  // Token prices (in a real app, would come from an API)
+  
   const [tokenPrices, setTokenPrices] = useState<TokenPrices>({
     'ETH': 1800,
     'WETH': 1800,
@@ -79,7 +79,7 @@ export default function useBlockchainData() {
     'DAI': 1,
   });
   
-  // Fetch the current block number and gas price
+  
   const fetchBlockchainInfo = useCallback(async () => {
     if (!provider || !isConnected) return;
     
@@ -100,7 +100,7 @@ export default function useBlockchainData() {
     }
   }, [provider, isConnected]);
   
-  // Fetch ETH balance
+  
   const fetchEthBalance = useCallback(async () => {
     if (!provider || !account || !isConnected) return;
     
@@ -117,14 +117,14 @@ export default function useBlockchainData() {
     }
   }, [provider, account, isConnected]);
   
-  // Fetch token balances
+  
   const fetchTokenBalances = useCallback(async (tokenAddresses: string[]) => {
     if (!provider || !account || !isConnected || !chainId) return;
     
     try {
       setState(prev => ({ ...prev, tokensLoading: true }));
       
-      // Fetch all token data in parallel
+      
       const tokenData = await Promise.all(
         tokenAddresses.map(async (address) => {
           try {
@@ -133,7 +133,7 @@ export default function useBlockchainData() {
               getTokenBalance(address, account, provider),
             ]);
             
-            // Calculate USD value if price is available
+            
             const priceUSD = tokenPrices[metadata.symbol] || null;
             const balanceUSD = priceUSD ? parseFloat(balance) * priceUSD : null;
             
@@ -150,7 +150,7 @@ export default function useBlockchainData() {
         })
       );
       
-      // Filter out failed token fetches
+      
       const validTokens = tokenData.filter(Boolean) as TokenWithBalance[];
       
       setState(prev => ({
@@ -168,7 +168,7 @@ export default function useBlockchainData() {
     }
   }, [provider, account, isConnected, chainId, tokenPrices]);
   
-  // Fetch transaction history
+  
   const fetchTransactionHistory = useCallback(async (page = 0, pageSize = 10) => {
     if (!provider || !account || !isConnected || !chainId) return;
     
@@ -183,7 +183,7 @@ export default function useBlockchainData() {
         pageSize
       );
       
-      // Transform the transaction data as needed
+      
       const transactions = txHistory.map((tx: any) => ({
         user: tx.user,
         target: tx.target,
@@ -209,7 +209,7 @@ export default function useBlockchainData() {
     }
   }, [provider, account, isConnected, chainId]);
   
-  // Check token allowances for a specific spender
+  
   const checkAllowances = useCallback(async (
     tokenAddresses: string[],
     spenderAddress: string
@@ -251,28 +251,28 @@ export default function useBlockchainData() {
     }
   }, [provider, account, isConnected]);
   
-  // Refresh all data
+  
   const refreshAllData = useCallback(() => {
     fetchBlockchainInfo();
     fetchEthBalance();
     
-    // Add your token addresses here
+    
     if (chainId) {
       const commonTokens = [];
       
-      // Use Linea tokens if on Linea network
+      
       if (chainId === 59144) {
         commonTokens.push(
-          '0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f', // WETH on Linea
-          '0x176211869cA2b568f2A7D4EE941E073a821EE1ff', // USDC on Linea
-          '0x4AF15ec2A0BD43Db75dd04E62FAA3B8EF36b00d5'  // DAI on Linea
+          '0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f', 
+          '0x176211869cA2b568f2A7D4EE941E073a821EE1ff', 
+          '0x4AF15ec2A0BD43Db75dd04E62FAA3B8EF36b00d5'  
         );
       } else if (chainId === 11155111) {
-        // Fallback to Sepolia tokens
+        
         commonTokens.push(
-          '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14', // WETH on Sepolia
-          '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238', // USDC on Sepolia
-          '0x68194a729C2450ad26072b3D33ADaCbcef39D574'  // DAI on Sepolia
+          '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14', 
+          '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238', 
+          '0x68194a729C2450ad26072b3D33ADaCbcef39D574'  
         );
       }
       
@@ -289,15 +289,15 @@ export default function useBlockchainData() {
     fetchTransactionHistory
   ]);
   
-  // Effect to set up event listeners
+  
   useEffect(() => {
     if (!provider || !isConnected) return;
     
-    // Setup event listeners for new blocks
+    
     const onBlock = (blockNumber: number) => {
       setState(prev => ({ ...prev, blockNumber }));
       
-      // Refresh gas price periodically (not on every block)
+      
       if (blockNumber % 10 === 0) {
         provider.getGasPrice().then(gasPrice => {
           setState(prev => ({
@@ -310,21 +310,21 @@ export default function useBlockchainData() {
     
     provider.on('block', onBlock);
     
-    // Initial data fetch
+    
     refreshAllData();
     
-    // Cleanup
+    
     return () => {
       provider.removeListener('block', onBlock);
     };
   }, [provider, isConnected, refreshAllData]);
   
-  // Effect to refresh when account or chain changes
+  
   useEffect(() => {
     if (isConnected && account && chainId) {
       refreshAllData();
     } else {
-      // Reset state when disconnected
+      
       setState({
         blockNumber: null,
         gasPrice: null,

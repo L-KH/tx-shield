@@ -33,7 +33,7 @@ const MultiNetworkSelector: React.FC<MultiNetworkSelectorProps> = ({
     networkName, 
     connect,
     account,
-    switchToSepolia
+    switchToLinea
   } = useMetaMask();
   
   // Local state
@@ -43,14 +43,14 @@ const MultiNetworkSelector: React.FC<MultiNetworkSelectorProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   
   // Manually determine if we're on the correct network
-  const isCorrectNetwork = chainId === CHAIN_ID.SEPOLIA;
+  const isCorrectNetwork = chainId === CHAIN_ID.LINEA;
   
   // Network icons - in a real app, import actual image files
   const getNetworkIcon = (networkId: number): string => {
     switch (networkId) {
       case CHAIN_ID.MAINNET:
         return '/icons/ethereum.svg';
-      case CHAIN_ID.SEPOLIA:
+      case CHAIN_ID.LINEA:
         return '/icons/sepolia.svg';
       case CHAIN_ID.POLYGON:
         return '/icons/polygon.svg';
@@ -75,12 +75,12 @@ const MultiNetworkSelector: React.FC<MultiNetworkSelectorProps> = ({
         testnet: false
       },
       {
-        id: CHAIN_ID.SEPOLIA, 
-        name: NETWORK_NAMES[CHAIN_ID.SEPOLIA], 
-        icon: getNetworkIcon(CHAIN_ID.SEPOLIA),
+        id: CHAIN_ID.LINEA, 
+        name: NETWORK_NAMES[CHAIN_ID.LINEA], 
+        icon: getNetworkIcon(CHAIN_ID.LINEA),
         isSupported: true,
-        isTXShieldAvailable: CONTRACT_ADDRESSES.TXShield[CHAIN_ID.SEPOLIA] !== '0x0000000000000000000000000000000000000000',
-        blockExplorer: BLOCK_EXPLORERS[CHAIN_ID.SEPOLIA],
+        isTXShieldAvailable: CONTRACT_ADDRESSES.TXShield[CHAIN_ID.LINEA] !== '0x0000000000000000000000000000000000000000',
+        blockExplorer: BLOCK_EXPLORERS[CHAIN_ID.LINEA],
         description: 'Ethereum testnet',
         testnet: true
       },
@@ -148,10 +148,10 @@ const MultiNetworkSelector: React.FC<MultiNetworkSelectorProps> = ({
     
     setIsLoading(true);
     try {
-      await switchToSepolia();
+      await switchToLinea();
       setShowNetworkList(false);
       if (onNetworkChange) {
-        onNetworkChange(CHAIN_ID.SEPOLIA);
+        onNetworkChange(CHAIN_ID.LINEA);
       }
     } catch (error) {
       console.error('Failed to switch network:', error);
