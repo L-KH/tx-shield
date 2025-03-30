@@ -98,33 +98,67 @@ function getCachedContract(
 
 export async function getTXShieldContract(
   providerOrSigner: ethers.providers.Provider | ethers.Signer,
-  chainId: number
+  chainIdParam?: number
 ): Promise<ethers.Contract> {
-  
-  const contractAddress = CONTRACT_ADDRESSES.TXShield[chainId];
-  if (!contractAddress || contractAddress === '0x0000000000000000000000000000000000000000') {
-    throw new Error(`TXShield contract not deployed on ${NETWORK_NAMES[chainId]}`);
-  }
-  
-  
-  let signer: ethers.Signer;
-  if (providerOrSigner instanceof ethers.providers.Provider) {
-    if ('getSigner' in providerOrSigner) {
-      try {
-        signer = (providerOrSigner as ethers.providers.Web3Provider).getSigner();
-      } catch {
-        throw new Error('Provider does not have a signer. Please connect a wallet.');
+  try {
+    let signer: ethers.Signer;
+    let chainId: number;
+    
+    // Determine if first parameter is a Provider or Signer
+    if (providerOrSigner instanceof ethers.Signer) {
+      signer = providerOrSigner;
+      
+      // If providerOrSigner is a Signer, we need chainId parameter
+      if (chainIdParam === undefined) {
+        // Get chainId from signer's provider if available
+        if (providerOrSigner.provider) {
+          const network = await providerOrSigner.provider.getNetwork();
+          chainId = network.chainId;
+        } else {
+          throw new Error('Chain ID is required when using a Signer without a provider');
+        }
+      } else {
+        chainId = chainIdParam;
       }
     } else {
-      throw new Error('Provider does not have a signer. Please connect a wallet.');
+      // providerOrSigner is a Provider
+      if ('getSigner' in providerOrSigner) {
+        try {
+          signer = (providerOrSigner as ethers.providers.Web3Provider).getSigner();
+        } catch (error) {
+          throw new Error('Provider does not have a signer. Please connect a wallet.');
+        }
+      } else {
+        throw new Error('Provider does not have a signer. Please connect a wallet.');
+      }
+      
+      // Get the chainId from the provider if not explicitly provided
+      if (chainIdParam === undefined) {
+        const network = await providerOrSigner.getNetwork();
+        chainId = network.chainId;
+      } else {
+        chainId = chainIdParam;
+      }
     }
-  } else {
-    signer = providerOrSigner;
+    
+    console.log(`Getting TXShield contract for chainId: ${chainId}`);
+    
+    // Get the contract address for the chain
+    const contractAddress = CONTRACT_ADDRESSES.TXShield[chainId];
+    if (!contractAddress || contractAddress === '0x0000000000000000000000000000000000000000') {
+      throw new Error(`TXShield not deployed on network with chainId ${chainId}`);
+    }
+    
+    console.log(`Using TXShield contract at: ${contractAddress}`);
+    
+    // Return a new contract instance
+    return new ethers.Contract(contractAddress, TXShieldABI, signer);
+  } catch (error) {
+    console.error('Error getting TXShield contract:', error);
+    throw error;
   }
-  
-  
-  return getCachedContract(contractAddress, TXShieldABI, signer);
 }
+
 
 export async function getThreatRegistryContract(
   providerOrSigner: ethers.providers.Provider | ethers.Signer,
@@ -155,27 +189,51 @@ export async function executeSecureTransaction(
   chainId: number,
   signer: ethers.Signer
 ): Promise<ethers.ContractReceipt> {
+  console.log(`Executing secure transaction on chain ${chainId}`);
   
+  // Get the TXShield contract
   const txShield = await getTXShieldContract(signer, chainId);
   
-  
+  // Convert the value to Wei
   const valueWei = ethers.utils.parseEther(value);
   
-  
+  // Calculate the fee (0.1%)
   const fee = valueWei.mul(10).div(10000);
-  const totalValue = valueWei.add(fee);
   
+  // Ensure minimum fee of 0.0005 ETH
+  const minFee = ethers.utils.parseEther("0.0005");
+  const actualFee = fee.lt(minFee) && !valueWei.isZero() ? minFee : fee;
   
+  // Total value to send
+  const totalValue = valueWei.add(actualFee);
+  
+  console.log(`Transaction details:`, {
+    to,
+    valueWei: valueWei.toString(),
+    data: data || '0x',
+    threatLevel,
+    fee: ethers.utils.formatEther(actualFee),
+    totalValue: ethers.utils.formatEther(totalValue)
+  });
+  
+  // Execute the transaction
   const tx = await txShield.secureExecute(
     to,
     valueWei,
-    data,
-    threatLevel,
-    { value: totalValue }
+    data || '0x',
+    threatLevel || 'SAFE',
+    { 
+      value: totalValue,
+      gasLimit: 300000  // Set a reasonable gas limit 
+    }
   );
   
+  console.log(`Transaction submitted: ${tx.hash}`);
+  
+  // Wait for transaction receipt
   return await tx.wait();
 }
+
 
 export async function getUserTransactionHistory(
   userAddress: string,

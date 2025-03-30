@@ -130,7 +130,29 @@ const RiskConfirmationDialog: React.FC<RiskConfirmationDialogProps> = ({
               </div>
             )}
           </div>
-          
+          <div className="mt-4 p-4 bg-blue-900/30 rounded-lg">
+            <h3 className="font-medium mb-2 flex items-center">
+              <Shield size={16} className="mr-2" />
+              TX Shield Protection
+            </h3>
+            
+            <p className="text-sm mb-3">
+              TX Shield will execute your transaction through our secure smart contract,
+              providing additional protection against scams and exploits.
+            </p>
+            
+            {threatLevel === 'HIGH' || threatLevel === 'CRITICAL' ? (
+              <div className="bg-blue-800/30 p-3 rounded text-sm mt-2">
+                <div className="flex items-start">
+                  <Info size={16} className="text-blue-400 mr-2 flex-shrink-0 mt-0.5" />
+                  <p>
+                    For high risk transactions, we strongly recommend using TX Shield protection
+                    for additional security layers and verification.
+                  </p>
+                </div>
+              </div>
+            ) : null}
+          </div>
           <div className="flex flex-col space-y-4">
             <label className="flex items-center space-x-3 cursor-pointer">
               <input 

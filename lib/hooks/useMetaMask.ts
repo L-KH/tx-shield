@@ -354,20 +354,43 @@ export function useMetaMask(): MetaMaskHookResult {
         throw new Error('No signer available');
       }
       
+      // Format the transaction with better logging
+      console.log('Sending direct transaction via MetaMask:', txData);
       
+      // Make sure the transaction is properly formatted
       const tx = {
         to: txData.to,
-        from: txData.from,
-        data: txData.data,
+        from: txData.from || account,
+        data: txData.data || '0x',
+        // Convert string value to BigNumber if it exists
         value: txData.value ? ethers.BigNumber.from(txData.value) : ethers.BigNumber.from(0),
-        chainId: txData.chainId
+        chainId: txData.chainId || chainId
       };
       
+      console.log('Formatted transaction details:', {
+        to: tx.to,
+        from: tx.from,
+        data: tx.data.substring(0, 66) + (tx.data.length > 66 ? '...' : ''),
+        value: tx.value.toString(),
+        chainId: tx.chainId
+      });
       
-      return await signer.sendTransaction(tx);
+      // Send the transaction
+      const txResponse = await signer.sendTransaction(tx);
+      console.log('Transaction submitted:', txResponse.hash);
+      return txResponse;
     } catch (err: any) {
-      console.error('Transaction failed:', err);
-      setError(`Transaction failed: ${err.message || 'Unknown error'}`);
+      // Provide more descriptive errors
+      if (err.code === 4001) {
+        console.error('User rejected transaction signature');
+        setError('Transaction was rejected. Please try again.');
+      } else if (err.message && err.message.includes('insufficient funds')) {
+        console.error('Insufficient funds for transaction');
+        setError('Insufficient funds to complete this transaction');
+      } else {
+        console.error('Transaction failed:', err);
+        setError(`Transaction failed: ${err.message || 'Unknown error'}`);
+      }
       throw err;
     }
   };

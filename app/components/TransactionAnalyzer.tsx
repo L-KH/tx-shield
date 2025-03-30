@@ -150,9 +150,8 @@ const [riskDialogDetails, setRiskDialogDetails] = useState({
     details: false,
     simulation: false,
     recommendations: true,
-    secureContract: false  // Add this property
+    secureContract: true  // Now defaults to true
   });
-
   const { addToast, removeToast, showConfirm } = useToast();
 
   
@@ -950,12 +949,56 @@ const createFallbackThreatAnalysis = (transaction) => {
     }
   };
 };
-
+const SecureExecutionBanner = ({ isEnabled, onToggle }) => {
+  return (
+    <div className="mb-6 bg-blue-900/30 p-4 rounded-lg">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center">
+          <div className="bg-blue-600 p-2 rounded-full mr-4">
+            <Shield size={20} />
+          </div>
+          <div>
+            <h3 className="font-medium mb-1">TX Shield Smart Contract Protection</h3>
+            <p className="text-sm text-gray-300">
+              Execute your transaction through our audited smart contract for enhanced security
+            </p>
+          </div>
+        </div>
+        
+        <label className="flex items-center cursor-pointer">
+          <div className="relative">
+            <input
+              type="checkbox"
+              className="sr-only"
+              checked={isEnabled}
+              onChange={onToggle}
+            />
+            <div className={`block w-14 h-7 rounded-full ${isEnabled ? 'bg-green-600' : 'bg-gray-600'}`}></div>
+            <div className={`dot absolute left-1 top-1 bg-white w-5 h-5 rounded-full transition ${isEnabled ? 'transform translate-x-7' : ''}`}></div>
+          </div>
+          <span className="ml-3 font-medium">{isEnabled ? 'Enabled' : 'Disabled'}</span>
+        </label>
+      </div>
+      
+      {isEnabled && (
+        <div className="mt-4 bg-blue-800/30 p-3 rounded text-sm">
+          <div className="flex items-start">
+            <Info size={16} className="text-blue-400 mr-2 flex-shrink-0 mt-0.5" />
+            <p>
+              Your transaction will be executed through our secure TX Shield contract
+              with additional security checks and protections. A small fee of 0.1% applies.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
   // Add this for executing transactions with risk confirmation
 // Helper function to create fallback simulation (add this to your component)
 // An improved fallback simulation function that uses the actual transaction values
 const createFallbackSimulation = (transaction) => {
-  //console.log('Creating fallback simulation for transaction:', transaction);
+  console.log('Creating fallback simulation for transaction:', transaction);
 
   // Determine transaction type based on data
   const isApproval = transaction.data?.startsWith('0x095ea7b3') || false;
@@ -970,17 +1013,19 @@ const createFallbackSimulation = (transaction) => {
   const ethPrice = 3500; // Current ETH price as of March 2025
   const valueUsd = valueEth * ethPrice;
   
-  //console.log(`Transaction value: ${valueEth} ETH ($${valueUsd})`);
-  
   // Calculate gas usage based on transaction type
   const gasUsage = isSwap ? 150000 : 
                  isApproval ? (isUnlimitedApproval ? 55000 : 46000) : 
                  isTokenTransfer ? 65000 :
                  isEthTransfer ? 21000 : 65000;
   
-  // Calculate gas cost (assuming 30 gwei gas price)
-  const gasCostEth = (gasUsage * 30 * 1e-9).toFixed(6);
+  // Calculate gas cost using Linea's much lower gas price (0.05 Gwei instead of 30 Gwei)
+  // This is a critical fix for accurate gas estimation
+  const gasPrice = 0.05; // Gwei - Much more accurate for Linea
+  const gasCostEth = (gasUsage * gasPrice * 1e-9).toFixed(9);
   const gasCostUsd = (parseFloat(gasCostEth) * ethPrice).toFixed(2);
+  
+  console.log(`Gas estimation: ${gasUsage} gas units at ${gasPrice} Gwei = ${gasCostEth} ETH ($${gasCostUsd})`);
   
   // Generate balance changes based on transaction type
   let balanceChanges = [];
@@ -1157,10 +1202,14 @@ const executeTransaction = async () => {
   try {
     // Execute transaction based on user preference
     if (expanded.secureContract && isCorrectNetwork) {
-      // Use TX Shield contract for enhanced security
+      // Log for debugging
+      console.log('Executing via TXShield contract');
+      
+      // Fix the value formatting - don't use ethers.utils.formatEther as it's already a string
+      // and we want the original wei value for contract calls
       const txResponse = await executeSecureTransaction(
         transaction.to,
-        ethers.utils.formatEther(transaction.value || '0'),
+        transaction.value ? ethers.utils.formatEther(transaction.value) : '0',
         transaction.data,
         threatAnalysis.threatLevel
       );
@@ -1172,13 +1221,14 @@ const executeTransaction = async () => {
           action: {
             label: 'View Transaction',
             onClick: () => {
-              window.open(`https://lineascan.build/tx/${txResponse.hash}`, '_blank');
+              window.open(`https://lineascan.build/tx/${txResponse.transactionHash || txResponse.hash}`, '_blank');
             },
           },
         });
       }
     } else {
       // Direct execution through MetaMask
+      console.log('Executing directly via MetaMask');
       const txResponse = await sendTransaction(transaction);
       
       if (txResponse) {
@@ -1702,7 +1752,7 @@ const createSimpleTxShieldData = (to, data, value) => {
                 <div>
                   <span className="text-sm">Protection Fee:</span>
                   <span className="text-sm font-medium ml-2">
-                    0.0005 ETH
+                    0.1% (0.0005 ETH min)
                   </span>
                 </div>
                 
@@ -1711,13 +1761,13 @@ const createSimpleTxShieldData = (to, data, value) => {
                     <input
                       type="checkbox"
                       className="sr-only"
-                      checked={true}
-                      onChange={() => {}}
+                      checked={expanded.secureContract}
+                      onChange={() => setExpanded(prev => ({ ...prev, secureContract: !prev.secureContract }))}
                     />
-                    <div className="block bg-green-600 w-10 h-6 rounded-full"></div>
-                    <div className="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition"></div>
+                    <div className={`block w-10 h-6 rounded-full ${expanded.secureContract ? 'bg-green-600' : 'bg-gray-600'}`}></div>
+                    <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition ${expanded.secureContract ? 'transform translate-x-4' : ''}`}></div>
                   </div>
-                  <span className="ml-2 text-sm">Enabled</span>
+                  <span className="ml-2 text-sm">{expanded.secureContract ? 'Enabled' : 'Disabled'}</span>
                 </label>
               </div>
             </div>
@@ -1726,7 +1776,6 @@ const createSimpleTxShieldData = (to, data, value) => {
       </motion.div>
     );
   };
-  
   // Render simulation results
 // Improved renderSimulation function with better data handling
 const renderSimulation = () => {
@@ -2369,13 +2418,17 @@ return (
             </div>
             
             <AnimatePresence mode="wait">
-              {activeTab === 'analysis' && (
-                <motion.div
-                  key="analysis"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                >
+            {activeTab === 'analysis' && (
+              <motion.div
+                key="analysis"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                    <SecureExecutionBanner 
+                      isEnabled={expanded.secureContract} 
+                      onToggle={() => setExpanded(prev => ({ ...prev, secureContract: !prev.secureContract }))}
+                    />
                   {/* =============== NEW MEV PROTECTION UI WITH TOOLTIPS =============== */}
                   {threatAnalysis && threatAnalysis.threatLevel !== 'SAFE' && simulation?.mevExposure && (
                     <div className="bg-gray-800 p-4 rounded-lg mb-6">
@@ -2433,7 +2486,6 @@ return (
                         },
                         details: {
                           protocol: simulation.details?.protocol || 'Unknown',
-                          // Add more details based on your transaction data
                         },
                         flags: {
                           riskFlags: threatAnalysis.mitigationSuggestions || [],
@@ -2443,14 +2495,12 @@ return (
                           type: 'SECURITY',
                           title: `Recommendation ${index + 1}`,
                           description: suggestion,
-                          actionable: index === 0, // Make first suggestion actionable
+                          actionable: index === 0,
                           priority: index === 0 ? 'high' : 'medium',
                         })),
                       }}
                       onApplyRecommendation={(recommendation) => {
-                        // Handle recommendation application
                         console.log('Applying recommendation:', recommendation);
-                        // For example, this could modify the transaction data
                       }}
                     />
                   )}
@@ -2464,19 +2514,30 @@ return (
                       <ArrowRight size={16} className="ml-2" />
                     </button>
                     
-                    {/* =============== UPDATED EXECUTE BUTTON =============== */}
+                    {/* Updated execute button with better labeling */}
                     <button
-                      onClick={executeTransactionWithConfirmation} // Use the new confirmation wrapper
+                      onClick={executeTransactionWithConfirmation}
                       className={`px-4 py-2 rounded-md transition-colors flex items-center ${
-                        threatAnalysis && threatAnalysis.threatLevel === 'CRITICAL' ? 
-                        'bg-red-700 hover:bg-red-800' : 
-                        threatAnalysis && threatAnalysis.threatLevel === 'HIGH' ? 
-                        'bg-orange-600 hover:bg-orange-700' :
-                        'bg-green-600 hover:bg-green-700'
+                        !expanded.secureContract ? 
+                          (threatAnalysis && threatAnalysis.threatLevel === 'CRITICAL' ? 
+                            'bg-red-700 hover:bg-red-800' : 
+                            threatAnalysis && threatAnalysis.threatLevel === 'HIGH' ? 
+                              'bg-orange-600 hover:bg-orange-700' :
+                              'bg-green-600 hover:bg-green-700') :
+                          'bg-blue-600 hover:bg-blue-700' // Always blue for TX Shield
                       }`}
                     >
-                      Execute Transaction
-                      <ArrowRight size={16} className="ml-2" />
+                      {expanded.secureContract ? (
+                        <>
+                          Execute with TX Shield
+                          <Shield size={16} className="ml-2" />
+                        </>
+                      ) : (
+                        <>
+                          Execute Transaction
+                          <ArrowRight size={16} className="ml-2" />
+                        </>
+                      )}
                     </button>
                   </div>
                 </motion.div>

@@ -97,14 +97,23 @@ export async function executeSecureTransaction(to, value, data, threatLevel) {
     const provider = new ethers.providers.Web3Provider(window.ethereum);
     const txShield = await getTXShieldContract(provider);
     
-    
+    // Convert ETH to Wei for the value parameter
     const valueWei = ethers.utils.parseEther(value);
     
-    
+    // Calculate fee (0.1% fee)
     const fee = valueWei.mul(10).div(10000);
     const totalValue = valueWei.add(fee);
     
+    // Debug logs
+    console.log('TXShield secureExecute call:', {
+      to,
+      valueWei: valueWei.toString(),
+      data,
+      threatLevel,
+      totalValue: totalValue.toString()
+    });
     
+    // Execute the transaction
     const tx = await txShield.secureExecute(
       to,
       valueWei,

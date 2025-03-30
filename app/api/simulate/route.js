@@ -55,7 +55,8 @@ export async function POST(req) {
     const gasUsage = isSwap ? 150000 : (isApproval ? (isUnlimitedApproval ? 55000 : 46000) : 21000);
     
     // Calculate mock gas cost (30 gwei)
-    const gasCostEth = (gasUsage * 30 * 1e-9).toFixed(6);
+    const gasPrice = 0.05; // Gwei
+    const gasCostEth = (gasUsage * gasPrice * 1e-9).toFixed(9);  
     const gasCostUSD = (parseFloat(gasCostEth) * ethPrice).toFixed(2);
     
     // Generate mock balance changes based on transaction type
