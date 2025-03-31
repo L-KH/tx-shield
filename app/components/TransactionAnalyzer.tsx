@@ -2622,25 +2622,32 @@ return (
       onSelectTemplate={handleSelectTemplate}
       templates={[
         {
-          name: "Token Approval (Unlimited)",
-          to: '0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f', // WETH on Linea
+          name: "CROAK Token Approval (Unlimited)",
+          to: '0xacb54d07ca167934f57f829bee2cc665e1a5ebef', // CROAK on Linea
           data: '0x095ea7b3000000000000000000000000646e4ee3ee5fdd82497ae2b6ea7f9cd333fe8ef9ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', // Approve Horizondex Router unlimited
           value: '0',
+          description: 'CROAK unlimited approval to Horizondex Router on Linea'
+        },
+        {
+          name: "CROAK Token Approval (Limited)",
+          to: '0xacb54d07ca167934f57f829bee2cc665e1a5ebef', // CROAK on Linea
+          data: '0x095ea7b3000000000000000000000000646e4ee3ee5fdd82497ae2b6ea7f9cd333fe8ef90000000000000000000000000000000000000000000000056bc75e2d63100000', // Approve 100 CROAK
+          value: '0',
+          description: 'CROAK limited approval (100 CROAK) to Horizondex Router on Linea'
+        },
+        {
+          name: "CROAK Token Transfer",
+          to: '0xacb54d07ca167934f57f829bee2cc665e1a5ebef', // CROAK on Linea
+          data: '0xa9059cbb0000000000000000000000001234567890123456789012345678901234567890000000000000000000000000000000000000000000000008ac7230489e80000', // Transfer 10 CROAK
+          value: '0',
+          description: 'Transfer 10 CROAK to another address on Linea'
+        },
+        {
+          name: "WETH Token Approval (Unlimited)",
+          to: '0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f', // WETH on Linea
+          data: '0x095ea7b3000000000000000000000000646e4ee3ee5fdd82497ae2b6ea7f9cd333fe8ef9ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', 
+          value: '0',
           description: 'WETH unlimited approval to Horizondex Router on Linea'
-        },
-        {
-          name: "Token Approval (Limited)",
-          to: '0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f', // WETH on Linea
-          data: '0x095ea7b3000000000000000000000000646e4ee3ee5fdd82497ae2b6ea7f9cd333fe8ef90000000000000000000000000000000000000000000000001bc16d674ec80000', // Approve 2 WETH
-          value: '0',
-          description: 'WETH limited approval (2 WETH) to Horizondex Router on Linea'
-        },
-        {
-          name: "Token Transfer",
-          to: '0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f', // WETH on Linea
-          data: '0xa9059cbb0000000000000000000000001234567890123456789012345678901234567890000000000000000000000000000000000000000000000000de0b6b3a7640000', // Transfer 1 WETH
-          value: '0',
-          description: 'Transfer 1 WETH to another address on Linea'
         },
         {
           name: "ETH Transfer",
